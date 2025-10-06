@@ -15,6 +15,20 @@ RUN apt-get update && apt-get install -y \
     supervisor \
     openbox \
     ca-certificates \
+    libgbm1 \
+    libasound2 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libxss1 \
     && rm -rf /var/lib/apt/lists/*
 
 ARG OBSIDIAN_VERSION=1.7.7
