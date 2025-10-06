@@ -4,9 +4,17 @@
 
 - **Run all tests**: `make test` or `./scripts/test.sh`
 - **Run health check**: `make health` or `./scripts/health-check.sh`
+- **Install Obsidian**: `make install-obsidian` or `./scripts/install-obsidian.sh`
 - **Validate scripts**: `shellcheck scripts/*.sh`
 - **Validate compose**: `docker compose config`
 - **Lint markdown**: Uses markdownlint (see `.markdownlint.json`)
+
+## Project Structure
+
+- **vaults/**: Obsidian vault directories (auto-created, gitignored)
+- **downloads/**: Cached downloads of Obsidian and plugins (gitignored)
+- **data/**: CouchDB data and config (gitignored)
+- **backups/**: Database backups (gitignored)
 
 ## Code Style
 

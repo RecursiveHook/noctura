@@ -74,6 +74,23 @@ This creates the Obsidian database and configures optimal settings.
 
 ### Configure Obsidian Plugin
 
+#### Automated Setup (Recommended for Linux Servers)
+
+```bash
+./scripts/install-obsidian.sh [vault_path]
+```
+
+This will automatically:
+- Download and install Obsidian AppImage (AMD64 or ARM64)
+- Create a vault at `./vaults/noctura-vault` (or custom path)
+- Install Self-hosted LiveSync plugin
+- Configure plugin with your CouchDB connection
+- Enable the plugin
+
+Then launch Obsidian and open your vault to start syncing.
+
+#### Manual Setup
+
 1. Install "Self-hosted LiveSync" plugin in Obsidian
 2. Open plugin settings
 3. Configure remote database:

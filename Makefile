@@ -1,25 +1,29 @@
-.PHONY: help setup start stop restart logs status backup restore test health clean
+.PHONY: help setup start stop restart logs status backup restore test health clean install-obsidian
 
 help:
 	@echo "Noctura - Obsidian LiveSync with CouchDB"
 	@echo ""
 	@echo "Available commands:"
-	@echo "  make setup      - Initial setup (creates .env, directories, starts services)"
-	@echo "  make start      - Start all services"
-	@echo "  make stop       - Stop all services"
-	@echo "  make restart    - Restart all services"
-	@echo "  make logs       - View logs (Ctrl+C to exit)"
-	@echo "  make status     - Show service status"
-	@echo "  make health     - Run health checks"
-	@echo "  make test       - Run integration tests"
-	@echo "  make backup     - Create backup"
-	@echo "  make restore    - Restore from backup (prompts for file)"
-	@echo "  make clean      - Stop services and remove containers (keeps data)"
-	@echo "  make clean-all  - Remove everything including data (DANGEROUS)"
+	@echo "  make setup           - Initial setup (creates .env, directories, starts services)"
+	@echo "  make install-obsidian - Install Obsidian and configure LiveSync plugin"
+	@echo "  make start           - Start all services"
+	@echo "  make stop            - Stop all services"
+	@echo "  make restart         - Restart all services"
+	@echo "  make logs            - View logs (Ctrl+C to exit)"
+	@echo "  make status          - Show service status"
+	@echo "  make health          - Run health checks"
+	@echo "  make test            - Run integration tests"
+	@echo "  make backup          - Create backup"
+	@echo "  make restore         - Restore from backup (prompts for file)"
+	@echo "  make clean           - Stop services and remove containers (keeps data)"
+	@echo "  make clean-all       - Remove everything including data (DANGEROUS)"
 	@echo ""
 
 setup:
 	@./scripts/setup.sh
+
+install-obsidian:
+	@./scripts/install-obsidian.sh
 
 start:
 	@echo "Starting services..."

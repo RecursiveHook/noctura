@@ -1,6 +1,8 @@
 .env
 data/
 backups/
+downloads/
+vaults/
 *.tar.gz
 *.log
 .DS_Store

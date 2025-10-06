@@ -2,13 +2,57 @@
 
 This guide walks you through configuring Obsidian's Self-hosted LiveSync plugin with your Noctura CouchDB instance.
 
+## Quick Automated Setup (Recommended)
+
+Run the automated installation script for Linux servers:
+
+```bash
+./scripts/install-obsidian.sh [vault_path]
+```
+
+If you don't specify a vault path, it will automatically create one at `./vaults/noctura-vault`.
+
+This will:
+- Download and install Obsidian AppImage for your architecture (AMD64 or ARM64)
+- Create a vault directory with initial configuration
+- Download and install the Self-hosted LiveSync plugin
+- Automatically configure the plugin with your CouchDB connection
+- Enable the plugin in your vault
+
+**Supported Platforms:**
+- Linux AMD64 (x86_64)
+- Linux ARM64 (aarch64)
+
+After running the script:
+1. Launch Obsidian: `/opt/noctura/Obsidian.AppImage`
+2. Open your vault (the script will display the path)
+3. Go to Settings → Self-hosted LiveSync
+4. Click 'Test Database Connection' to verify
+5. Click 'Initialize Database' (first device) or 'Rebuild Database' (additional devices)
+6. Click 'Start' to begin syncing
+
+### Environment Variables
+
+You can customize the installation:
+
+```bash
+# Use a specific Obsidian version
+OBSIDIAN_VERSION=1.5.3 ./scripts/install-obsidian.sh
+
+# Use a custom vault name
+VAULT_NAME=my-vault ./scripts/install-obsidian.sh
+
+# Or specify vault path directly
+./scripts/install-obsidian.sh /path/to/my/vault
+```
+
 ## Prerequisites
 
 - Noctura running (`docker compose up -d`)
 - Obsidian installed on your device
 - Self-hosted LiveSync plugin installed
 
-## Setup Steps
+## Manual Setup Steps
 
 ### 1. Install Plugin
 
