@@ -14,10 +14,12 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
+# shellcheck source=../.env
 source .env
 
 COUCHDB_PORT=${COUCHDB_PORT:-5984}
 COUCHDB_USER=${COUCHDB_USER:-admin}
+COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
 DB_NAME=${1:-obsidian}
 
 echo "Initializing database: $DB_NAME"
@@ -74,12 +76,6 @@ curl -sf -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
     -d '"true"' > /dev/null || echo "    Warning: Could not set CORS credentials"
 
 echo "  • Setting up compaction..."
-COMPACTION_RULE='{
-    "db_fragmentation": "70%",
-    "view_fragmentation": "60%",
-    "from": "00:00",
-    "to": "06:00"
-}'
 
 curl -sf -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
     -X PUT "http://localhost:${COUCHDB_PORT}/${DB_NAME}/_compact" \

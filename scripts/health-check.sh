@@ -113,8 +113,6 @@ if docker compose ps 2>/dev/null | grep -q "noctura-couchdb"; then
                 
                 if curl -sf -u "${COUCHDB_USER:-admin}:${COUCHDB_PASSWORD}" "http://localhost:${COUCHDB_PORT}/_all_dbs" > /dev/null 2>&1; then
                     echo -e "${GREEN}✓${NC} CouchDB authentication working"
-                    
-                    DB_COUNT=$(curl -s -u "${COUCHDB_USER:-admin}:${COUCHDB_PASSWORD}" "http://localhost:${COUCHDB_PORT}/_all_dbs" 2>/dev/null | grep -o '\[' | wc -l)
                     echo -e "${GREEN}✓${NC} CouchDB is accessible"
                 else
                     echo -e "${RED}✗${NC} CouchDB authentication failed"

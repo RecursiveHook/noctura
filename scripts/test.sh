@@ -14,10 +14,12 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
+# shellcheck source=../.env
 source .env
 
 COUCHDB_PORT=${COUCHDB_PORT:-5984}
 COUCHDB_USER=${COUCHDB_USER:-admin}
+COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
 TEST_DB="noctura_test_$(date +%s)"
 FAILED_TESTS=0
 
@@ -63,7 +65,7 @@ DOC_ID="test_doc_$(date +%s)"
 RESPONSE=$(curl -s -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
     -X PUT "http://localhost:${COUCHDB_PORT}/${TEST_DB}/${DOC_ID}" \
     -H "Content-Type: application/json" \
-    -d '{"test": "data", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}')
+    -d '{"test": "data", "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}')
 if echo "$RESPONSE" | grep -q '"ok":true'; then
     test_passed "Document creation successful"
     REV=$(echo "$RESPONSE" | grep -o '"rev":"[^"]*"' | cut -d'"' -f4)
@@ -87,7 +89,7 @@ if [ -n "${REV:-}" ]; then
     RESPONSE=$(curl -s -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
         -X PUT "http://localhost:${COUCHDB_PORT}/${TEST_DB}/${DOC_ID}?rev=${REV}" \
         -H "Content-Type: application/json" \
-        -d '{"test": "updated", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}')
+        -d '{"test": "updated", "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}')
     if echo "$RESPONSE" | grep -q '"ok":true'; then
         test_passed "Document update successful"
         NEW_REV=$(echo "$RESPONSE" | grep -o '"rev":"[^"]*"' | cut -d'"' -f4)
