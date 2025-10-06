@@ -20,7 +20,6 @@ fi
 
 # Get container IPs
 OBSIDIAN_IP=$(docker inspect noctura-obsidian -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
-COUCHDB_IP=$(docker inspect noctura-couchdb -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
 
 echo "✅ All containers running"
 echo ""

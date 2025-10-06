@@ -211,7 +211,7 @@ configure_livesync_plugin() {
   
   local couchdb_url="http://localhost:${COUCHDB_PORT:-5984}"
   local couchdb_user="${COUCHDB_USER:-admin}"
-  local couchdb_password="${COUCHDB_PASSWORD}"
+  local couchdb_password="${COUCHDB_PASSWORD:-}"
   
   cat > "${config_file}" <<EOF
 {
