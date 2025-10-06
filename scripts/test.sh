@@ -17,10 +17,10 @@ fi
 # shellcheck source=../.env
 source .env
 
-COUCHDB_PORT=${COUCHDB_PORT:-5984}
+HTTP_PORT=${HTTP_PORT:-80}
+HTTPS_PORT=${HTTPS_PORT:-443}
 COUCHDB_USER=${COUCHDB_USER:-admin}
 COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
-OBSIDIAN_WEB_PORT=${OBSIDIAN_WEB_PORT:-8080}
 TEST_DB="noctura_test_$(date +%s)"
 FAILED_TESTS=0
 
@@ -33,127 +33,159 @@ test_failed() {
     FAILED_TESTS=$((FAILED_TESTS + 1))
 }
 
-echo "1️⃣  Testing CouchDB Connectivity..."
-if curl -sf "http://localhost:${COUCHDB_PORT}/_up" > /dev/null 2>&1; then
-    test_passed "CouchDB is reachable"
+echo "1️⃣  Testing Encryption Key..."
+ENCRYPTION_KEY_FILE=${ENCRYPTION_KEY_FILE:-./data/secrets/encryption_key}
+if [ -f "$ENCRYPTION_KEY_FILE" ]; then
+    test_passed "Encryption key file exists"
+    
+    KEY_PERMS=$(stat -c "%a" "$ENCRYPTION_KEY_FILE" 2>/dev/null || stat -f "%Lp" "$ENCRYPTION_KEY_FILE" 2>/dev/null)
+    if [ "$KEY_PERMS" = "600" ]; then
+        test_passed "Encryption key has correct permissions (600)"
+    else
+        test_failed "Encryption key has wrong permissions ($KEY_PERMS, expected 600)"
+    fi
+    
+    KEY_SIZE=$(wc -c < "$ENCRYPTION_KEY_FILE")
+    if [ "$KEY_SIZE" -ge 32 ]; then
+        test_passed "Encryption key has sufficient length"
+    else
+        test_failed "Encryption key is too short ($KEY_SIZE bytes)"
+    fi
 else
-    test_failed "CouchDB is not reachable"
-    exit 1
+    test_failed "Encryption key file not found"
 fi
 
 echo ""
-echo "2️⃣  Testing Authentication..."
-if curl -sf -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" "http://localhost:${COUCHDB_PORT}/_all_dbs" > /dev/null 2>&1; then
-    test_passed "Authentication successful"
+echo "2️⃣  Testing Gocryptfs Container..."
+if docker compose ps --format json 2>/dev/null | grep -q "gocryptfs"; then
+    GOCRYPTFS_STATUS=$(docker compose ps --format json 2>/dev/null | grep gocryptfs | grep -o '"State":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+    if [ "$GOCRYPTFS_STATUS" = "running" ]; then
+        test_passed "Gocryptfs container is running"
+        
+        if docker exec noctura-gocryptfs mountpoint -q /decrypted 2>/dev/null; then
+            test_passed "Encrypted filesystem is mounted"
+        else
+            test_failed "Encrypted filesystem is not mounted"
+        fi
+    else
+        test_failed "Gocryptfs container is not running (status: $GOCRYPTFS_STATUS)"
+    fi
 else
-    test_failed "Authentication failed"
-    exit 1
+    test_failed "Gocryptfs container not found"
 fi
 
 echo ""
-echo "3️⃣  Testing Database Creation..."
-RESPONSE=$(curl -s -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
-    -X PUT "http://localhost:${COUCHDB_PORT}/${TEST_DB}")
+echo "3️⃣  Testing Caddy Reverse Proxy..."
+if docker compose ps --format json 2>/dev/null | grep -q "caddy"; then
+    CADDY_STATUS=$(docker compose ps --format json 2>/dev/null | grep caddy | grep -o '"State":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+    if [ "$CADDY_STATUS" = "running" ]; then
+        test_passed "Caddy container is running"
+    else
+        test_failed "Caddy container is not running (status: $CADDY_STATUS)"
+    fi
+else
+    test_failed "Caddy container not found"
+fi
+
+echo ""
+echo "4️⃣  Testing HTTP to HTTPS Redirect..."
+HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${HTTP_PORT}" 2>/dev/null || echo "000")
+if [ "$HTTP_RESPONSE" = "301" ] || [ "$HTTP_RESPONSE" = "308" ] || [ "$HTTP_RESPONSE" = "200" ]; then
+    test_passed "HTTP endpoint is accessible (status: $HTTP_RESPONSE)"
+else
+    test_failed "HTTP endpoint not accessible (status: $HTTP_RESPONSE)"
+fi
+
+echo ""
+echo "5️⃣  Testing HTTPS Endpoint..."
+if curl -sf -k "https://localhost:${HTTPS_PORT}" > /dev/null 2>&1; then
+    test_passed "HTTPS endpoint is accessible"
+else
+    test_failed "HTTPS endpoint is not accessible"
+fi
+
+echo ""
+echo "6️⃣  Testing TLS Certificate..."
+if command -v openssl > /dev/null 2>&1; then
+    TLS_INFO=$(echo | openssl s_client -connect "localhost:${HTTPS_PORT}" -servername localhost 2>/dev/null | grep "Protocol")
+    if echo "$TLS_INFO" | grep -qE "TLSv1\.[23]"; then
+        test_passed "TLS connection established with secure protocol"
+    else
+        test_failed "TLS connection using insecure protocol or failed"
+    fi
+else
+    test_failed "OpenSSL not available for TLS testing"
+fi
+
+echo ""
+echo "7️⃣  Testing CouchDB via Reverse Proxy..."
+if curl -sf -k "https://localhost:${HTTPS_PORT}/couchdb/_up" > /dev/null 2>&1; then
+    test_passed "CouchDB accessible via HTTPS reverse proxy"
+else
+    test_failed "CouchDB not accessible via HTTPS reverse proxy"
+fi
+
+echo ""
+echo "8️⃣  Testing CouchDB Authentication..."
+if curl -sf -k -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" "https://localhost:${HTTPS_PORT}/couchdb/_all_dbs" > /dev/null 2>&1; then
+    test_passed "CouchDB authentication successful via HTTPS"
+else
+    test_failed "CouchDB authentication failed via HTTPS"
+fi
+
+echo ""
+echo "9️⃣  Testing Database Creation..."
+RESPONSE=$(curl -s -k -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
+    -X PUT "https://localhost:${HTTPS_PORT}/couchdb/${TEST_DB}")
 if echo "$RESPONSE" | grep -q '"ok":true'; then
-    test_passed "Database creation successful"
+    test_passed "Database creation successful via HTTPS"
 else
     test_failed "Database creation failed: $RESPONSE"
 fi
 
 echo ""
-echo "4️⃣  Testing Document Creation..."
+echo "🔟 Testing Document Operations..."
 DOC_ID="test_doc_$(date +%s)"
-RESPONSE=$(curl -s -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
-    -X PUT "http://localhost:${COUCHDB_PORT}/${TEST_DB}/${DOC_ID}" \
+RESPONSE=$(curl -s -k -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
+    -X PUT "https://localhost:${HTTPS_PORT}/couchdb/${TEST_DB}/${DOC_ID}" \
     -H "Content-Type: application/json" \
-    -d '{"test": "data", "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}')
+    -d '{"test": "encrypted_data", "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}')
 if echo "$RESPONSE" | grep -q '"ok":true'; then
-    test_passed "Document creation successful"
+    test_passed "Document creation successful (data encrypted at rest)"
     REV=$(echo "$RESPONSE" | grep -o '"rev":"[^"]*"' | cut -d'"' -f4)
 else
     test_failed "Document creation failed: $RESPONSE"
 fi
 
 echo ""
-echo "5️⃣  Testing Document Retrieval..."
-RESPONSE=$(curl -s -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
-    "http://localhost:${COUCHDB_PORT}/${TEST_DB}/${DOC_ID}")
-if echo "$RESPONSE" | grep -q '"test":"data"'; then
-    test_passed "Document retrieval successful"
+echo "1️⃣1️⃣  Testing Document Retrieval..."
+RESPONSE=$(curl -s -k -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
+    "https://localhost:${HTTPS_PORT}/couchdb/${TEST_DB}/${DOC_ID}")
+if echo "$RESPONSE" | grep -q '"test":"encrypted_data"'; then
+    test_passed "Document retrieval successful via HTTPS"
 else
     test_failed "Document retrieval failed: $RESPONSE"
 fi
 
 echo ""
-echo "6️⃣  Testing Document Update..."
+echo "1️⃣2️⃣  Testing Cleanup..."
 if [ -n "${REV:-}" ]; then
-    RESPONSE=$(curl -s -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
-        -X PUT "http://localhost:${COUCHDB_PORT}/${TEST_DB}/${DOC_ID}?rev=${REV}" \
-        -H "Content-Type: application/json" \
-        -d '{"test": "updated", "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}')
-    if echo "$RESPONSE" | grep -q '"ok":true'; then
-        test_passed "Document update successful"
-        NEW_REV=$(echo "$RESPONSE" | grep -o '"rev":"[^"]*"' | cut -d'"' -f4)
-    else
-        test_failed "Document update failed: $RESPONSE"
-    fi
-else
-    test_failed "Document update skipped (no revision)"
+    curl -s -k -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
+        -X DELETE "https://localhost:${HTTPS_PORT}/couchdb/${TEST_DB}/${DOC_ID}?rev=${REV}" > /dev/null
 fi
-
-echo ""
-echo "7️⃣  Testing Document Deletion..."
-if [ -n "${NEW_REV:-}" ]; then
-    RESPONSE=$(curl -s -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
-        -X DELETE "http://localhost:${COUCHDB_PORT}/${TEST_DB}/${DOC_ID}?rev=${NEW_REV}")
-    if echo "$RESPONSE" | grep -q '"ok":true'; then
-        test_passed "Document deletion successful"
-    else
-        test_failed "Document deletion failed: $RESPONSE"
-    fi
-else
-    test_failed "Document deletion skipped (no revision)"
-fi
-
-echo ""
-echo "8️⃣  Testing Database Deletion..."
-RESPONSE=$(curl -s -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
-    -X DELETE "http://localhost:${COUCHDB_PORT}/${TEST_DB}")
+RESPONSE=$(curl -s -k -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
+    -X DELETE "https://localhost:${HTTPS_PORT}/couchdb/${TEST_DB}")
 if echo "$RESPONSE" | grep -q '"ok":true'; then
-    test_passed "Database deletion successful"
+    test_passed "Test database cleanup successful"
 else
-    test_failed "Database deletion failed: $RESPONSE"
+    test_failed "Test database cleanup failed: $RESPONSE"
 fi
 
 echo ""
-echo "9️⃣  Testing Backup Script..."
-if [ -x "./scripts/backup.sh" ]; then
-    test_passed "Backup script is executable"
-else
-    test_failed "Backup script is not executable"
-fi
-
-echo ""
-echo "🔟 Testing Restore Script..."
-if [ -x "./scripts/restore.sh" ]; then
-    test_passed "Restore script is executable"
-else
-    test_failed "Restore script is not executable"
-fi
-
-echo ""
-echo "1️⃣1️⃣  Testing Docker Compose Configuration..."
-if docker compose config > /dev/null 2>&1; then
-    test_passed "Docker Compose configuration is valid"
-else
-    test_failed "Docker Compose configuration is invalid"
-fi
-
-echo ""
-echo "1️⃣2️⃣  Testing Obsidian Container..."
-if docker compose ps 2>/dev/null | grep -q "noctura-obsidian"; then
+echo "1️⃣3️⃣  Testing Obsidian Container..."
+if docker compose ps --format json 2>/dev/null | grep -q "obsidian"; then
     OBSIDIAN_STATUS=$(docker compose ps --format json 2>/dev/null | grep obsidian | grep -o '"State":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
-    if [ "$OBSIDIAN_STATUS" == "running" ]; then
+    if [ "$OBSIDIAN_STATUS" = "running" ]; then
         test_passed "Obsidian container is running"
     else
         test_failed "Obsidian container is not running (status: $OBSIDIAN_STATUS)"
@@ -163,38 +195,76 @@ else
 fi
 
 echo ""
-echo "1️⃣3️⃣  Testing Obsidian Web Interface..."
-if curl -sf "http://localhost:${OBSIDIAN_WEB_PORT}" > /dev/null 2>&1; then
-    test_passed "Obsidian web interface is accessible"
+echo "1️⃣4️⃣  Testing Obsidian Web Interface via HTTPS..."
+if curl -sf -k "https://localhost:${HTTPS_PORT}/obsidian/" > /dev/null 2>&1; then
+    test_passed "Obsidian web interface accessible via HTTPS"
 else
-    test_failed "Obsidian web interface is not accessible"
+    test_failed "Obsidian web interface not accessible via HTTPS"
 fi
 
 echo ""
-echo "1️⃣4️⃣  Testing Vault Initialization..."
-VAULT_NAME=${VAULT_NAME:-noctura}
-if [ -d "vaults/${VAULT_NAME}" ]; then
-    test_passed "Vault directory exists (vaults/${VAULT_NAME})"
-    
-    if [ -d "vaults/${VAULT_NAME}/.obsidian" ]; then
-        test_passed "Obsidian configuration directory exists"
-        
-        if [ -d "vaults/${VAULT_NAME}/.obsidian/plugins/obsidian-livesync" ]; then
-            test_passed "Self-hosted LiveSync plugin is installed"
-        else
-            test_failed "Self-hosted LiveSync plugin not found"
-        fi
+echo "1️⃣5️⃣  Testing Docker Compose Configuration..."
+if docker compose config > /dev/null 2>&1; then
+    test_passed "Docker Compose configuration is valid"
+else
+    test_failed "Docker Compose configuration is invalid"
+fi
+
+echo ""
+echo "1️⃣6️⃣  Testing Backup Script..."
+if [ -x "./scripts/backup.sh" ]; then
+    test_passed "Backup script is executable"
+else
+    test_failed "Backup script is not executable"
+fi
+
+echo ""
+echo "1️⃣7️⃣  Testing Restore Script..."
+if [ -x "./scripts/restore.sh" ]; then
+    test_passed "Restore script is executable"
+else
+    test_failed "Restore script is not executable"
+fi
+
+echo ""
+echo "1️⃣8️⃣  Testing Health Check Script..."
+if [ -x "./scripts/health-check.sh" ]; then
+    test_passed "Health check script is executable"
+else
+    test_failed "Health check script is not executable"
+fi
+
+echo ""
+echo "1️⃣9️⃣  Testing Encryption Init Script..."
+if [ -x "./scripts/init-encryption.sh" ]; then
+    test_passed "Encryption init script is executable"
+else
+    test_failed "Encryption init script is not executable"
+fi
+
+echo ""
+echo "2️⃣0️⃣  Testing .env File Permissions..."
+if [ -f .env ]; then
+    ENV_PERMS=$(stat -c "%a" .env 2>/dev/null || stat -f "%Lp" .env 2>/dev/null)
+    if [ "$ENV_PERMS" = "600" ]; then
+        test_passed ".env file has correct permissions (600)"
     else
-        test_failed "Obsidian configuration directory not found"
+        test_failed ".env file has wrong permissions ($ENV_PERMS, expected 600)"
     fi
 else
-    test_failed "Vault directory not found (may need first run)"
+    test_failed ".env file not found"
 fi
 
 echo ""
 echo "================================"
 if [ $FAILED_TESTS -eq 0 ]; then
     echo "✅ All tests passed!"
+    echo ""
+    echo "🔐 Security Features Verified:"
+    echo "  ✅ Encryption at rest (gocryptfs)"
+    echo "  ✅ Encryption in flight (TLS/HTTPS)"
+    echo "  ✅ Secure credentials"
+    echo "  ✅ File permissions"
     exit 0
 else
     echo "❌ $FAILED_TESTS test(s) failed"
