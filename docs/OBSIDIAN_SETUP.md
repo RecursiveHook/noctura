@@ -1,56 +1,49 @@
 # Obsidian LiveSync Configuration Guide
 
-This guide walks you through configuring Obsidian's Self-hosted LiveSync plugin with your Noctura CouchDB instance.
+This guide walks you through using Obsidian with your Noctura CouchDB instance.
 
-## Quick Automated Setup (Recommended)
+## Quick Start (Containerized - Recommended)
 
-Run the automated installation script for Linux servers:
+The easiest way to get started is using the containerized Obsidian instance:
 
-```bash
-./scripts/install-obsidian.sh [vault_path]
-```
+1. Run setup:
+   ```bash
+   ./scripts/setup.sh
+   # Or: make setup
+   ```
 
-If you don't specify a vault path, it will automatically create one at `./vaults/noctura-vault`.
+2. Access Obsidian via web browser:
+   ```
+   http://localhost:8080/vnc.html
+   ```
 
-This will:
-- Download and install Obsidian AppImage for your architecture (AMD64 or ARM64)
-- Create a vault directory with initial configuration
-- Download and install the Self-hosted LiveSync plugin
-- Automatically configure the plugin with your CouchDB connection
-- Enable the plugin in your vault
+3. Your vault is automatically initialized with:
+   - Self-hosted LiveSync plugin installed and enabled
+   - CouchDB connection pre-configured
+   - Vault located at `./vaults/noctura` (persistent)
 
-**Supported Platforms:**
-- Linux AMD64 (x86_64)
-- Linux ARM64 (aarch64)
+4. Start using Obsidian immediately - sync is already configured!
 
-After running the script:
-1. Launch Obsidian: `/opt/noctura/Obsidian.AppImage`
-2. Open your vault (the script will display the path)
-3. Go to Settings → Self-hosted LiveSync
-4. Click 'Test Database Connection' to verify
-5. Click 'Initialize Database' (first device) or 'Rebuild Database' (additional devices)
-6. Click 'Start' to begin syncing
+### Customizing the Container
 
-### Environment Variables
-
-You can customize the installation:
+Edit `.env` to customize:
 
 ```bash
-# Use a specific Obsidian version
-OBSIDIAN_VERSION=1.5.3 ./scripts/install-obsidian.sh
-
-# Use a custom vault name
-VAULT_NAME=my-vault ./scripts/install-obsidian.sh
-
-# Or specify vault path directly
-./scripts/install-obsidian.sh /path/to/my/vault
+VAULT_NAME=my-vault              # Change vault name
+OBSIDIAN_WEB_PORT=8080          # Change web access port
+OBSIDIAN_VNC_PORT=5900          # Change VNC port
+VNC_PASSWORD=your-password      # Change VNC password
+COUCHDB_DATABASE=my-database    # Change database name
 ```
 
-## Prerequisites
+Then restart:
+```bash
+docker compose restart obsidian
+```
 
-- Noctura running (`docker compose up -d`)
-- Obsidian installed on your device
-- Self-hosted LiveSync plugin installed
+## Alternative: Local Desktop Client
+
+If you prefer using your local Obsidian installation:
 
 ## Manual Setup Steps
 
@@ -97,17 +90,29 @@ Recommended settings:
 
 ## Multi-Device Setup
 
+### Additional Containerized Instances
+
+To run multiple Obsidian instances (e.g., on different servers), simply deploy Noctura on each server. All containers will sync to the same CouchDB database.
+
 ### Desktop/Laptop
 
-Repeat steps above with same credentials.
+Follow the local client setup above with same credentials.
 
 ### Mobile (iOS/Android)
 
 1. Install Obsidian app
 2. Install Self-hosted LiveSync plugin
 3. Use same database URL and credentials
-4. For remote access, use your server's public IP or domain
-5. Consider using HTTPS with reverse proxy for security
+   - For remote access: `http://your-server-ip:5984/noctura`
+   - Or domain: `https://sync.yourdomain.com/noctura`
+4. Consider using HTTPS with reverse proxy for security
+
+### Accessing Container from Multiple Locations
+
+The containerized Obsidian web interface can be accessed from any device with a web browser:
+- Same network: `http://localhost:8080/vnc.html`
+- Remote (with port forward): `http://your-server-ip:8080/vnc.html`
+- Remote (with reverse proxy): `https://obsidian.yourdomain.com/vnc.html`
 
 ## Remote Access
 
@@ -134,6 +139,8 @@ caddy:
   volumes:
     - ./Caddyfile:/etc/caddy/Caddyfile
     - caddy-data:/data
+  networks:
+    - noctura-net
 ```
 
 ```
@@ -141,13 +148,38 @@ caddy:
 sync.yourdomain.com {
     reverse_proxy couchdb:5984
 }
+
+obsidian.yourdomain.com {
+    reverse_proxy obsidian:8080
+}
 ```
 
-Then use `https://sync.yourdomain.com/obsidian` as URI.
+Then use:
+- CouchDB: `https://sync.yourdomain.com/noctura`
+- Web UI: `https://obsidian.yourdomain.com/vnc.html`
 
 ## Troubleshooting
 
-### Connection Failed
+### Container Not Starting
+
+```bash
+# Check logs
+docker compose logs obsidian
+
+# Check if CouchDB is ready
+docker compose ps
+
+# Restart container
+docker compose restart obsidian
+```
+
+### Web Interface Not Loading
+
+- Wait 60 seconds after container start (initialization time)
+- Check health: `curl http://localhost:8080`
+- Verify port not in use: `netstat -tuln | grep 8080`
+
+### Connection Failed (Local Client)
 
 ```bash
 # Test CouchDB is accessible

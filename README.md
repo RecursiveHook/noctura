@@ -25,10 +25,10 @@ make setup
 The setup script will:
 - Generate secure credentials
 - Create necessary directories
-- Start CouchDB container
+- Start CouchDB and Obsidian containers
 - Display connection information
 
-Then configure Obsidian's Self-Hosted LiveSync plugin with the displayed credentials.
+Access Obsidian via web browser at `http://localhost:8080/vnc.html` or configure your local Obsidian client with the displayed credentials.
 
 ## Components
 
@@ -36,6 +36,12 @@ Then configure Obsidian's Self-Hosted LiveSync plugin with the displayed credent
 - Default port: `5984`
 - Admin interface: `http://localhost:5984/_utils`
 - Data persistence: `./data/couchdb`
+
+### Obsidian (Containerized)
+- Web interface: `http://localhost:8080/vnc.html`
+- VNC port: `5900`
+- Vault persistence: `./vaults`
+- Pre-configured with Self-hosted LiveSync plugin
 
 ### Configuration
 - Default credentials in `.env` (created on first run)
@@ -72,29 +78,28 @@ docker compose up -d
 
 This creates the Obsidian database and configures optimal settings.
 
-### Configure Obsidian Plugin
+### Access Obsidian
 
-#### Automated Setup (Recommended for Linux Servers)
+#### Containerized Web Access (Recommended)
 
-```bash
-./scripts/install-obsidian.sh [vault_path]
+After running setup, access Obsidian via web browser:
+
+```
+http://localhost:8080/vnc.html
 ```
 
-This will automatically:
-- Download and install Obsidian AppImage (AMD64 or ARM64)
-- Create a vault at `./vaults/noctura-vault` (or custom path)
-- Install Self-hosted LiveSync plugin
-- Configure plugin with your CouchDB connection
-- Enable the plugin
+The vault is automatically initialized with Self-hosted LiveSync plugin configured and connected to CouchDB.
 
-Then launch Obsidian and open your vault to start syncing.
+**Optional VNC Password**: Set in `.env` (default: `noctura`)
 
-#### Manual Setup
+#### Local Desktop Client
+
+Alternatively, use your local Obsidian installation:
 
 1. Install "Self-hosted LiveSync" plugin in Obsidian
 2. Open plugin settings
 3. Configure remote database:
-   - URL: `http://your-server:5984/obsidian`
+   - URL: `http://your-server:5984/noctura`
    - Username/Password: From `.env`
 4. Initialize sync and start syncing
 
@@ -103,22 +108,27 @@ See [docs/OBSIDIAN_SETUP.md](docs/OBSIDIAN_SETUP.md) for detailed instructions.
 ## Architecture
 
 ```
-┌─────────────────┐
-│  Obsidian App   │
-│  (Desktop/Web)  │
-└────────┬────────┘
-         │
-    LiveSync Plugin
-         │
-         ▼
-┌─────────────────┐      ┌──────────────┐
-│    CouchDB      │◄────►│  NextCloud   │
-│  (Port 5984)    │      │  (Optional)  │
-└─────────────────┘      └──────────────┘
-         │
-         ▼
-  ./data/couchdb
-  (Docker Volume)
+┌─────────────────────┐       ┌──────────────────┐
+│  Obsidian Desktop   │       │ Obsidian Web UI  │
+│   (Local Client)    │       │ (Container:8080) │
+└──────────┬──────────┘       └────────┬─────────┘
+           │                           │
+      LiveSync Plugin             Auto-configured
+           │                           │
+           └───────────┬───────────────┘
+                       ▼
+              ┌─────────────────┐      ┌──────────────┐
+              │    CouchDB      │◄────►│  NextCloud   │
+              │  (Port 5984)    │      │  (Optional)  │
+              └─────────────────┘      └──────────────┘
+                       │
+                       ▼
+                ./data/couchdb
+                (Docker Volume)
+                       │
+                       ▼
+                  ./vaults/
+              (Obsidian Vaults)
 ```
 
 ## Backup & Restore
@@ -177,7 +187,9 @@ Check CouchDB conflicts UI in plugin settings, resolve manually.
 ### Connection Issues
 ```bash
 docker compose logs couchdb
+docker compose logs obsidian
 curl http://localhost:5984  # Should return: {"couchdb":"Welcome",...}
+curl http://localhost:8080  # Should return Obsidian web interface
 ```
 
 ### Database Corruption
@@ -202,6 +214,12 @@ See [docs/COUCHDB_CONFIG.md](docs/COUCHDB_CONFIG.md) for advanced troubleshootin
 | `COUCHDB_PASSWORD` | (generated) | CouchDB admin password |
 | `COUCHDB_PORT` | `5984` | Exposed CouchDB port |
 | `COUCHDB_DATA_DIR` | `./data/couchdb` | Data persistence path |
+| `COUCHDB_DATABASE` | `noctura` | Database name for sync |
+| `VAULT_NAME` | `noctura` | Obsidian vault name |
+| `OBSIDIAN_WEB_PORT` | `8080` | Web interface port |
+| `OBSIDIAN_VNC_PORT` | `5900` | VNC direct access port |
+| `OBSIDIAN_VAULTS_DIR` | `./vaults` | Vaults persistence path |
+| `VNC_PASSWORD` | `noctura` | VNC access password |
 
 ### Advanced Options
 

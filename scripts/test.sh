@@ -20,6 +20,7 @@ source .env
 COUCHDB_PORT=${COUCHDB_PORT:-5984}
 COUCHDB_USER=${COUCHDB_USER:-admin}
 COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+OBSIDIAN_WEB_PORT=${OBSIDIAN_WEB_PORT:-8080}
 TEST_DB="noctura_test_$(date +%s)"
 FAILED_TESTS=0
 
@@ -138,6 +139,56 @@ if [ -x "./scripts/restore.sh" ]; then
     test_passed "Restore script is executable"
 else
     test_failed "Restore script is not executable"
+fi
+
+echo ""
+echo "1️⃣1️⃣  Testing Docker Compose Configuration..."
+if docker compose config > /dev/null 2>&1; then
+    test_passed "Docker Compose configuration is valid"
+else
+    test_failed "Docker Compose configuration is invalid"
+fi
+
+echo ""
+echo "1️⃣2️⃣  Testing Obsidian Container..."
+if docker compose ps 2>/dev/null | grep -q "noctura-obsidian"; then
+    OBSIDIAN_STATUS=$(docker compose ps --format json 2>/dev/null | grep obsidian | grep -o '"State":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+    if [ "$OBSIDIAN_STATUS" == "running" ]; then
+        test_passed "Obsidian container is running"
+    else
+        test_failed "Obsidian container is not running (status: $OBSIDIAN_STATUS)"
+    fi
+else
+    test_failed "Obsidian container not found"
+fi
+
+echo ""
+echo "1️⃣3️⃣  Testing Obsidian Web Interface..."
+if curl -sf "http://localhost:${OBSIDIAN_WEB_PORT}" > /dev/null 2>&1; then
+    test_passed "Obsidian web interface is accessible"
+else
+    test_failed "Obsidian web interface is not accessible"
+fi
+
+echo ""
+echo "1️⃣4️⃣  Testing Vault Initialization..."
+VAULT_NAME=${VAULT_NAME:-noctura}
+if [ -d "vaults/${VAULT_NAME}" ]; then
+    test_passed "Vault directory exists (vaults/${VAULT_NAME})"
+    
+    if [ -d "vaults/${VAULT_NAME}/.obsidian" ]; then
+        test_passed "Obsidian configuration directory exists"
+        
+        if [ -d "vaults/${VAULT_NAME}/.obsidian/plugins/obsidian-livesync" ]; then
+            test_passed "Self-hosted LiveSync plugin is installed"
+        else
+            test_failed "Self-hosted LiveSync plugin not found"
+        fi
+    else
+        test_failed "Obsidian configuration directory not found"
+    fi
+else
+    test_failed "Vault directory not found (may need first run)"
 fi
 
 echo ""

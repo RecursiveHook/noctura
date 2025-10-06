@@ -29,19 +29,36 @@ docker compose down || {
 }
 
 echo "📂 Creating backup archive..."
+BACKUP_ITEMS=""
+
 if [ -d ./data ]; then
-    tar czf "$BACKUP_FILE" \
-        --exclude='./backups' \
-        --exclude='./.git' \
-        --exclude='./node_modules' \
-        ./data .env 2>/dev/null || {
-        tar czf "$BACKUP_FILE" --exclude='./backups' --exclude='./.git' ./data
-    }
-    echo "✅ Backup created: $BACKUP_FILE"
+    BACKUP_ITEMS="$BACKUP_ITEMS ./data"
 else
-    echo "❌ Error: ./data directory not found"
+    echo "⚠️  Warning: ./data directory not found"
+fi
+
+if [ -d ./vaults ]; then
+    BACKUP_ITEMS="$BACKUP_ITEMS ./vaults"
+    echo "📔 Including Obsidian vaults in backup"
+fi
+
+if [ -f .env ]; then
+    BACKUP_ITEMS="$BACKUP_ITEMS .env"
+fi
+
+if [ -z "$BACKUP_ITEMS" ]; then
+    echo "❌ Error: No data to backup (no ./data or ./vaults directory found)"
     exit 1
 fi
+
+tar czf "$BACKUP_FILE" \
+    --exclude='./backups' \
+    --exclude='./.git' \
+    --exclude='./node_modules' \
+    $BACKUP_ITEMS 2>/dev/null || {
+    tar czf "$BACKUP_FILE" --exclude='./backups' --exclude='./.git' $BACKUP_ITEMS
+}
+echo "✅ Backup created: $BACKUP_FILE"
 
 echo "🚀 Restarting containers..."
 docker compose up -d

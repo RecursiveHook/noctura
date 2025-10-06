@@ -92,6 +92,7 @@ fi
 
 echo ""
 echo "🐳 Checking Docker Services..."
+
 if docker compose ps 2>/dev/null | grep -q "noctura-couchdb"; then
     CONTAINER_STATUS=$(docker compose ps --format json 2>/dev/null | grep couchdb | grep -o '"State":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
     
@@ -131,6 +132,33 @@ else
     echo "   Run './scripts/setup.sh' or 'docker compose up -d' to start"
 fi
 
+if docker compose ps 2>/dev/null | grep -q "noctura-obsidian"; then
+    OBSIDIAN_STATUS=$(docker compose ps --format json 2>/dev/null | grep obsidian | grep -o '"State":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+    
+    if [ "$OBSIDIAN_STATUS" == "running" ]; then
+        echo -e "${GREEN}✓${NC} Obsidian container is running"
+        
+        if [ -f .env ]; then
+            source .env
+            OBSIDIAN_WEB_PORT=${OBSIDIAN_WEB_PORT:-8080}
+            
+            echo ""
+            echo "🌐 Checking Obsidian Web Interface..."
+            
+            if curl -sf "http://localhost:${OBSIDIAN_WEB_PORT}" > /dev/null 2>&1; then
+                echo -e "${GREEN}✓${NC} Obsidian web interface is accessible"
+                echo -e "${GREEN}✓${NC} Web URL: http://localhost:${OBSIDIAN_WEB_PORT}/vnc.html"
+            else
+                echo -e "${YELLOW}⚠${NC} Obsidian web interface not ready yet (may still be starting)"
+            fi
+        fi
+    else
+        echo -e "${YELLOW}⚠${NC} Obsidian container exists but is not running (status: $OBSIDIAN_STATUS)"
+    fi
+else
+    echo -e "${YELLOW}⚠${NC} Obsidian container is not running"
+fi
+
 echo ""
 echo "💾 Checking Data Persistence..."
 if [ -d "data/couchdb" ] && [ "$(ls -A data/couchdb 2>/dev/null)" ]; then
@@ -138,6 +166,14 @@ if [ -d "data/couchdb" ] && [ "$(ls -A data/couchdb 2>/dev/null)" ]; then
     echo -e "${GREEN}✓${NC} CouchDB data exists (size: $DATA_SIZE)"
 else
     echo -e "${YELLOW}⚠${NC} No CouchDB data found (fresh install)"
+fi
+
+if [ -d "vaults" ] && [ "$(ls -A vaults 2>/dev/null)" ]; then
+    VAULT_SIZE=$(du -sh vaults 2>/dev/null | cut -f1 || echo "unknown")
+    VAULT_COUNT=$(find vaults -maxdepth 1 -type d 2>/dev/null | tail -n +2 | wc -l)
+    echo -e "${GREEN}✓${NC} Obsidian vaults exist (count: $VAULT_COUNT, size: $VAULT_SIZE)"
+else
+    echo -e "${YELLOW}⚠${NC} No Obsidian vaults found (will be created on first run)"
 fi
 
 BACKUP_COUNT=$(find backups -name "noctura-*.tar.gz" 2>/dev/null | wc -l)

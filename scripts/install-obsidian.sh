@@ -196,7 +196,7 @@ install_livesync_plugin() {
 configure_livesync_plugin() {
   local vault_path="$1"
   
-  # shellcheck source=/dev/null
+  # shellcheck source=../.env
   if [[ -f "${PROJECT_ROOT}/.env" ]]; then
     source "${PROJECT_ROOT}/.env"
   else

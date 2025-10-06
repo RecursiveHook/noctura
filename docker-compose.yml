@@ -22,6 +22,39 @@ services:
       retries: 3
       start_period: 40s
 
+  obsidian:
+    build:
+      context: ./docker/obsidian
+      dockerfile: Dockerfile
+      args:
+        - TARGETARCH=${TARGETARCH:-amd64}
+    container_name: noctura-obsidian
+    restart: unless-stopped
+    ports:
+      - "${OBSIDIAN_WEB_PORT:-8080}:8080"
+      - "${OBSIDIAN_VNC_PORT:-5900}:5900"
+    environment:
+      - VAULT_NAME=${VAULT_NAME:-noctura}
+      - COUCHDB_URL=http://couchdb:5984
+      - COUCHDB_USER=${COUCHDB_USER:-admin}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      - COUCHDB_DATABASE=${COUCHDB_DATABASE:-noctura}
+      - VNC_PASSWORD=${VNC_PASSWORD:-noctura}
+      - DISPLAY=:99
+    volumes:
+      - ${OBSIDIAN_VAULTS_DIR:-./vaults}:/root/vaults
+    networks:
+      - noctura-net
+    depends_on:
+      couchdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
 networks:
   noctura-net:
     driver: bridge
