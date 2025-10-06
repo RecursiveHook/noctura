@@ -1,0 +1,48 @@
+{
+  auto_https off
+  admin off
+}
+
+:80 {
+  redir https://{host}{uri} permanent
+}
+
+:443 {
+  tls internal {
+    on_demand
+  }
+
+  handle /couchdb/* {
+    uri strip_prefix /couchdb
+    reverse_proxy couchdb:5984 {
+      header_up Host {upstream_hostport}
+      header_up X-Real-IP {remote_host}
+      header_up X-Forwarded-For {remote_host}
+      header_up X-Forwarded-Proto {scheme}
+    }
+  }
+
+  handle /obsidian/* {
+    uri strip_prefix /obsidian
+    reverse_proxy obsidian:8080 {
+      header_up Host {upstream_hostport}
+      header_up X-Real-IP {remote_host}
+      header_up X-Forwarded-For {remote_host}
+      header_up X-Forwarded-Proto {scheme}
+    }
+  }
+
+  handle /vnc/* {
+    uri strip_prefix /vnc
+    reverse_proxy obsidian:5900 {
+      header_up Host {upstream_hostport}
+      header_up X-Real-IP {remote_host}
+      header_up X-Forwarded-For {remote_host}
+      header_up X-Forwarded-Proto {scheme}
+    }
+  }
+
+  handle {
+    respond "Noctura - Secure Obsidian Sync" 200
+  }
+}
