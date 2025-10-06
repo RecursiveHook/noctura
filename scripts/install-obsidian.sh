@@ -196,8 +196,9 @@ install_livesync_plugin() {
 configure_livesync_plugin() {
   local vault_path="$1"
   
-  # shellcheck source=../.env
+  # shellcheck disable=SC2154
   if [[ -f "${PROJECT_ROOT}/.env" ]]; then
+    # shellcheck source=/dev/null
     source "${PROJECT_ROOT}/.env"
   else
     echo "❌ Error: .env file not found. Run setup.sh first."
