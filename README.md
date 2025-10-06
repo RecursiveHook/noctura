@@ -5,6 +5,8 @@ Turnkey containerized deployment for Obsidian with Self-Hosted LiveSync via Couc
 ## Features
 
 - **Self-Hosted Sync**: CouchDB-powered LiveSync for complete data ownership
+- **Encrypted Storage**: AES-256-GCM database encryption at rest with gocryptfs
+- **Secure Access**: TLS/HTTPS encryption in flight with automatic Let's Encrypt certificates
 - **Containerized Deployment**: Docker Compose setup for portability and ease of management
 - **Backup Ready**: Volume-based persistence with simple backup/restore workflows
 - **NextCloud Integration**: Planned support for file attachment syncing
@@ -23,29 +25,42 @@ make setup
 ```
 
 The setup script will:
-- Generate secure credentials
+- Generate secure credentials and encryption keys
+- Initialize encrypted database storage
 - Create necessary directories
-- Start CouchDB and Obsidian containers
+- Start all containers (CouchDB, Obsidian, Caddy reverse proxy, encryption layer)
 - Display connection information
 
-Access Obsidian via web browser at `http://localhost:8080/vnc.html` or configure your local Obsidian client with the displayed credentials.
+Access Obsidian via web browser at `https://localhost` (development) or configure your local Obsidian client with the displayed credentials.
 
 ## Components
 
+### Caddy Reverse Proxy
+- Default ports: `80` (HTTP) and `443` (HTTPS)
+- Automatic HTTPS with Let's Encrypt in production
+- Self-signed certificates in development mode
+- Routes: `/couchdb`, `/obsidian`, `/vnc`
+
 ### CouchDB
-- Default port: `5984`
-- Admin interface: `http://localhost:5984/_utils`
-- Data persistence: `./data/couchdb`
+- Internal port: `5984` (accessed via Caddy reverse proxy)
+- Admin interface: `https://localhost/couchdb/_utils`
+- Data persistence: Encrypted volume managed by gocryptfs
 
 ### Obsidian (Containerized)
-- Web interface: `http://localhost:8080/vnc.html`
-- VNC port: `5900`
+- Web interface: `https://localhost/obsidian`
+- VNC access: `https://localhost/vnc`
 - Vault persistence: `./vaults`
 - Pre-configured with Self-hosted LiveSync plugin
 
+### Security Layer (gocryptfs)
+- AES-256-GCM encryption at rest
+- Transparent encryption/decryption
+- 32-byte secure encryption key
+- Protects all CouchDB data
+
 ### Configuration
-- Default credentials in `.env` (created on first run)
-- SSL/TLS support via reverse proxy (Caddy/Traefik)
+- Credentials and encryption keys in `.env` (created on first run)
+- TLS certificates managed automatically by Caddy
 
 ## Setup
 
@@ -64,8 +79,10 @@ make setup
 
 ```bash
 cp .env.example .env
-nano .env  # Configure credentials
-mkdir -p data/couchdb data/config backups
+nano .env  # Configure credentials and encryption key
+mkdir -p data/config data/encrypted data/secrets data/logs/caddy backups vaults
+echo "your-32-byte-encryption-key" > data/secrets/encryption_key
+chmod 600 data/secrets/encryption_key .env
 docker compose up -d
 ```
 
@@ -84,13 +101,19 @@ This creates the Obsidian database and configures optimal settings.
 
 After running setup, access Obsidian via web browser:
 
+**Development:**
 ```
-http://localhost:8080/vnc.html
+https://localhost (self-signed certificate)
+```
+
+**Production:**
+```
+https://your-domain.com
 ```
 
 The vault is automatically initialized with Self-hosted LiveSync plugin configured and connected to CouchDB.
 
-**Optional VNC Password**: Set in `.env` (default: `noctura`)
+**Credentials**: Displayed once during setup (save them securely)
 
 #### Local Desktop Client
 
@@ -99,7 +122,7 @@ Alternatively, use your local Obsidian installation:
 1. Install "Self-hosted LiveSync" plugin in Obsidian
 2. Open plugin settings
 3. Configure remote database:
-   - URL: `http://your-server:5984/noctura`
+   - URL: `https://your-domain.com/couchdb/noctura` (or `https://localhost/couchdb/noctura` for dev)
    - Username/Password: From `.env`
 4. Initialize sync and start syncing
 
@@ -110,25 +133,40 @@ See [docs/OBSIDIAN_SETUP.md](docs/OBSIDIAN_SETUP.md) for detailed instructions.
 ```
 ┌─────────────────────┐       ┌──────────────────┐
 │  Obsidian Desktop   │       │ Obsidian Web UI  │
-│   (Local Client)    │       │ (Container:8080) │
+│   (Local Client)    │       │   (Container)    │
 └──────────┬──────────┘       └────────┬─────────┘
            │                           │
       LiveSync Plugin             Auto-configured
            │                           │
            └───────────┬───────────────┘
+                       │
+                  HTTPS (TLS)
+                       │
+                       ▼
+              ┌────────────────┐
+              │  Caddy Proxy   │
+              │  (443/80)      │
+              └────────┬───────┘
+                       │
                        ▼
               ┌─────────────────┐      ┌──────────────┐
               │    CouchDB      │◄────►│  NextCloud   │
-              │  (Port 5984)    │      │  (Optional)  │
-              └─────────────────┘      └──────────────┘
-                       │
-                       ▼
-                ./data/couchdb
-                (Docker Volume)
-                       │
-                       ▼
-                  ./vaults/
-              (Obsidian Vaults)
+              │  (Internal)     │      │  (Optional)  │
+              └─────────┬───────┘      └──────────────┘
+                        │
+                        ▼
+              ┌─────────────────┐
+              │  gocryptfs      │
+              │  AES-256-GCM    │
+              └─────────┬───────┘
+                        │
+                        ▼
+                 ./data/encrypted
+                 (Encrypted Volume)
+                        │
+                        ▼
+                   ./vaults/
+               (Obsidian Vaults)
 ```
 
 ## Backup & Restore
@@ -161,11 +199,15 @@ Add to crontab for daily backups at 2 AM:
 
 ## Security Considerations
 
-- Change default credentials immediately
-- Use HTTPS/TLS in production (reverse proxy recommended)
-- Restrict CouchDB port exposure (use firewall/VPN)
-- Regular backup automation
-- Consider database encryption at rest
+- **Encryption at Rest**: All database data encrypted with AES-256-GCM
+- **Encryption in Flight**: TLS/HTTPS for all network communication
+- **Secure Key Storage**: Encryption keys stored with 600 permissions
+- **Automatic SSL**: Let's Encrypt certificates in production mode
+- **Network Isolation**: Internal services not directly exposed
+- **Reverse Proxy**: Caddy handles all external access
+- **Credential Security**: Auto-generated strong passwords
+
+For detailed security information, see [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Troubleshooting
 
@@ -188,8 +230,10 @@ Check CouchDB conflicts UI in plugin settings, resolve manually.
 ```bash
 docker compose logs couchdb
 docker compose logs obsidian
-curl http://localhost:5984  # Should return: {"couchdb":"Welcome",...}
-curl http://localhost:8080  # Should return Obsidian web interface
+docker compose logs caddy
+docker compose logs gocryptfs
+curl https://localhost/couchdb  # Should return: {"couchdb":"Welcome",...}
+curl https://localhost/obsidian # Should return Obsidian web interface
 ```
 
 ### Database Corruption
@@ -212,14 +256,19 @@ See [docs/COUCHDB_CONFIG.md](docs/COUCHDB_CONFIG.md) for advanced troubleshootin
 |----------|---------|-------------|
 | `COUCHDB_USER` | `admin` | CouchDB admin username |
 | `COUCHDB_PASSWORD` | (generated) | CouchDB admin password |
-| `COUCHDB_PORT` | `5984` | Exposed CouchDB port |
-| `COUCHDB_DATA_DIR` | `./data/couchdb` | Data persistence path |
 | `COUCHDB_DATABASE` | `noctura` | Database name for sync |
 | `VAULT_NAME` | `noctura` | Obsidian vault name |
-| `OBSIDIAN_WEB_PORT` | `8080` | Web interface port |
-| `OBSIDIAN_VNC_PORT` | `5900` | VNC direct access port |
 | `OBSIDIAN_VAULTS_DIR` | `./vaults` | Vaults persistence path |
-| `VNC_PASSWORD` | `noctura` | VNC access password |
+| `VNC_PASSWORD` | (generated) | VNC access password |
+| `ENCRYPTION_KEY` | (generated) | 32-byte encryption key |
+| `ENCRYPTION_KEY_FILE` | `./data/secrets/encryption_key` | Path to encryption key file |
+| `ENCRYPTED_DATA_DIR` | `./data/encrypted` | Encrypted data storage |
+| `ENVIRONMENT` | `dev` | Deployment mode: `dev` or `production` |
+| `DOMAIN` | `localhost` | Domain for production TLS |
+| `TLS_EMAIL` | - | Email for Let's Encrypt certificates |
+| `HTTP_PORT` | `80` | HTTP port (redirects to HTTPS) |
+| `HTTPS_PORT` | `443` | HTTPS port |
+| `CADDY_LOG_DIR` | `./data/logs/caddy` | Caddy logs directory |
 
 ### Advanced Options
 
@@ -236,7 +285,7 @@ docker compose restart couchdb
 Edit `docker-compose.yml` to customize:
 - Network configuration
 - Resource limits
-- Additional services (Caddy, Traefik)
+- Additional services
 
 ## Management Commands
 
@@ -253,6 +302,9 @@ make health     # Run health checks
 make test       # Run integration tests
 make backup     # Create backup
 make restore    # Restore from backup
+make build      # Build all containers
+make validate   # Validate configuration files
+make init-encryption  # Initialize encryption key
 ```
 
 ### Using Scripts Directly
@@ -310,7 +362,9 @@ The project includes comprehensive tests:
 - **Shellcheck**: Validates shell script quality
 - **Docker validation**: Ensures compose file is valid
 - **Integration tests**: Full CouchDB CRUD operations
-- **Health checks**: System validation
+- **Security tests**: Encryption, TLS, and file permissions validation
+- **Service health**: Container status and connectivity checks
+- **HTTPS verification**: TLS protocol and certificate validation
 
 GitHub Actions automatically runs all tests on push/PR.
 
