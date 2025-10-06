@@ -25,9 +25,10 @@ services:
   obsidian:
     build:
       context: ./docker/obsidian
-      dockerfile: Dockerfile
       args:
-        - TARGETARCH=${TARGETARCH:-amd64}
+        - OBSIDIAN_VERSION=${OBSIDIAN_VERSION:-1.7.7}
+        - LIVESYNC_VERSION=${LIVESYNC_VERSION:-0.25.20}
+    platform: linux/amd64
     container_name: noctura-obsidian
     restart: unless-stopped
     ports:
