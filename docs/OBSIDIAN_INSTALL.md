@@ -56,7 +56,7 @@ OBSIDIAN_VERSION=1.5.3 VAULT_NAME=work ./scripts/install-obsidian.sh
 
 5. First device:
    - Click "Initialize Database"
-   
+
 6. Additional devices:
    - Click "Rebuild Database"
 
