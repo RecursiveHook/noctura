@@ -1,0 +1,64 @@
+{
+    "name": "OpenCode AI Agent ARM64 Dev Container",
+
+    // Using ARM64-compatible image with base utilities
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bullseye",
+
+    "runArgs": ["--platform=linux/arm64"],
+
+    "features": {
+        "ghcr.io/danzilberdan/devcontainers/opencode:0": {},
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": true,
+            "installOhMyZsh": true,
+            "upgradePackages": true,
+            "username": "node",
+            "userUid": "automatic",
+            "userGid": "automatic"
+        },
+        "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+            "moby": true,
+            "installDockerBuildx": true,
+            "version": "latest",
+            "dockerDashComposeVersion": "v2"
+        }
+    },
+
+    "mounts": [
+        "source=${localEnv:HOME}/.local/share/opencode/auth.json,target=/home/node/.local/share/opencode/auth.json,type=bind,consistency=cached"
+    ],
+
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "esbenp.prettier-vscode",
+                "streetsidesoftware.code-spell-checker",
+                "ms-vscode.cpptools",
+                "ms-vscode.cmake-tools"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "terminal.integrated.profiles.linux": {
+                    "bash": {
+                        "path": "bash",
+                        "icon": "terminal-bash"
+                    },
+                    "zsh": {
+                        "path": "zsh"
+                    }
+                }
+            }
+        }
+    },
+
+    "postCreateCommand": "sudo mkdir -p /home/node/.local/share/opencode && sudo chown -R node:node /home/node/.local && sudo apt-get update && sudo apt-get install -y build-essential wget && wget -qO- https://github.com/Kitware/CMake/releases/download/v3.27.7/cmake-3.27.7-linux-aarch64.tar.gz | sudo tar -xz -C /usr/local --strip-components=1 && chmod 600 ~/.local/share/opencode/auth.json 2>/dev/null && opencode --version && echo 'OpenCode installed successfully!' && ls -la ~/.local/share/opencode/auth.json && echo 'Auth file configured!' && cmake --version && echo 'CMake 3.27.7 installed successfully!' || echo 'Warning: Setup incomplete'",
+
+    "remoteUser": "node",
+
+    // Additional capabilities for development
+    "capAdd": ["SYS_PTRACE"],
+
+    "containerEnv": {
+        "DEBIAN_FRONTEND": "noninteractive"
+    }
+}

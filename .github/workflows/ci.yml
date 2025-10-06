@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
+          severity: warning
+
+  docker-compose-validation:
+    name: Validate Docker Compose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Validate docker-compose.yml
+        run: docker compose config
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create .env file
+        run: |
+          cp .env.example .env
+          sed -i 's/change_this_secure_password/test_password_123456789/' .env
+      
+      - name: Create data directories
+        run: mkdir -p data/couchdb data/config backups
+      
+      - name: Start services
+        run: docker compose up -d
+      
+      - name: Wait for CouchDB
+        run: |
+          timeout=60
+          until curl -sf http://localhost:5984/_up > /dev/null 2>&1; do
+            timeout=$((timeout - 1))
+            if [ $timeout -le 0 ]; then
+              echo "Timeout waiting for CouchDB"
+              docker compose logs couchdb
+              exit 1
+            fi
+            echo "Waiting for CouchDB... ($timeout seconds remaining)"
+            sleep 2
+          done
+          echo "CouchDB is ready!"
+      
+      - name: Run health checks
+        run: ./scripts/health-check.sh
+      
+      - name: Run integration tests
+        run: ./scripts/test.sh
+      
+      - name: Check CouchDB logs
+        if: always()
+        run: docker compose logs couchdb
+      
+      - name: Stop services
+        if: always()
+        run: docker compose down -v
+
+  markdown-lint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Lint Markdown files
+        uses: avto-dev/markdown-lint@v1
+        with:
+          args: '**/*.md'
+          ignore: 'node_modules'

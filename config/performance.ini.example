@@ -1,0 +1,29 @@
+[couchdb]
+max_dbs_open = 1000
+delayed_commits = false
+file_compression = snappy
+
+[chttpd]
+max_http_request_size = 8589934592
+bind_address = 0.0.0.0
+backlog = 512
+
+[httpd]
+enable_cors = true
+bind_address = 0.0.0.0
+
+[cors]
+origins = *
+credentials = true
+headers = accept, authorization, content-type, origin, referer, x-requested-with
+methods = GET, PUT, POST, HEAD, DELETE
+
+[log]
+level = warning
+
+[compactions]
+_default = [{db_fragmentation, "60%"}, {view_fragmentation, "50%"}, {from, "00:00"}, {to, "06:00"}]
+
+[query_server_config]
+reduce_limit = true
+os_process_limit = 100

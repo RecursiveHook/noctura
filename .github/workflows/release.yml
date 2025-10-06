@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create Release Archive
+        run: |
+          tar czf noctura-${{ github.ref_name }}.tar.gz \
+            --exclude='.git' \
+            --exclude='data' \
+            --exclude='backups' \
+            --exclude='.env' \
+            --exclude='node_modules' \
+            .
+      
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          cat << 'EOF' > release-notes.md
+          ## Noctura ${{ github.ref_name }}
+          
+          ### Installation
+          
+          1. Download and extract the release archive
+          2. Run `./scripts/setup.sh`
+          3. Configure Obsidian Self-hosted LiveSync plugin
+          
+          ### Quick Start
+          
+          ```bash
+          tar xzf noctura-${{ github.ref_name }}.tar.gz
+          cd noctura
+          ./scripts/setup.sh
+          ```
+          
+          ### What's Included
+          
+          - CouchDB 3.3 Docker configuration
+          - Automated setup and backup scripts
+          - Health check and testing utilities
+          - Comprehensive documentation
+          
+          ### Requirements
+          
+          - Docker 20.10+
+          - Docker Compose 2.0+
+          
+          See README.md for full documentation.
+          EOF
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: release-notes.md
+          files: noctura-${{ github.ref_name }}.tar.gz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
