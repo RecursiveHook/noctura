@@ -45,8 +45,8 @@ RUN mkdir -p /tmp/livesync && \
     wget "https://github.com/vrtmrz/obsidian-livesync/releases/download/${LIVESYNC_VERSION}/manifest.json" && \
     wget "https://github.com/vrtmrz/obsidian-livesync/releases/download/${LIVESYNC_VERSION}/styles.css"
 
-COPY docker/obsidian/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY docker/obsidian/entrypoint.sh /entrypoint.sh
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 WORKDIR /vault
