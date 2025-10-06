@@ -1,20 +1,49 @@
 version: '3.8'
 
 services:
+  gocryptfs:
+    build:
+      context: ./docker/gocryptfs
+    container_name: noctura-gocryptfs
+    restart: unless-stopped
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    environment:
+      - ENCRYPTED_DIR=/encrypted
+      - DECRYPTED_DIR=/decrypted
+      - PASSWORD_FILE=/run/secrets/encryption_key
+    volumes:
+      - ${ENCRYPTED_DATA_DIR:-./data/encrypted}:/encrypted
+      - couchdb-data:/decrypted
+    secrets:
+      - encryption_key
+    networks:
+      - noctura-net
+    healthcheck:
+      test: ["CMD", "mountpoint", "-q", "/decrypted"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   couchdb:
     image: couchdb:3.3
     container_name: noctura-couchdb
     restart: unless-stopped
-    ports:
-      - "${COUCHDB_PORT:-5984}:5984"
     environment:
       - COUCHDB_USER=${COUCHDB_USER:-admin}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
     volumes:
-      - ${COUCHDB_DATA_DIR:-./data/couchdb}:/opt/couchdb/data
+      - couchdb-data:/opt/couchdb/data
       - ${COUCHDB_CONFIG_DIR:-./data/config}:/opt/couchdb/etc/local.d
     networks:
       - noctura-net
+    depends_on:
+      gocryptfs:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5984/_up"]
       interval: 30s
@@ -31,16 +60,13 @@ services:
     platform: linux/amd64
     container_name: noctura-obsidian
     restart: unless-stopped
-    ports:
-      - "${OBSIDIAN_WEB_PORT:-8080}:8080"
-      - "${OBSIDIAN_VNC_PORT:-5900}:5900"
     environment:
       - VAULT_NAME=${VAULT_NAME:-noctura}
       - COUCHDB_URL=http://couchdb:5984
       - COUCHDB_USER=${COUCHDB_USER:-admin}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_DATABASE=${COUCHDB_DATABASE:-noctura}
-      - VNC_PASSWORD=${VNC_PASSWORD:-noctura}
+      - VNC_PASSWORD=${VNC_PASSWORD}
       - DISPLAY=:99
     volumes:
       - ${OBSIDIAN_VAULTS_DIR:-./vaults}:/root/vaults
@@ -56,6 +82,42 @@ services:
       retries: 3
       start_period: 60s
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: noctura-caddy
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+      - TLS_EMAIL=${TLS_EMAIL:-}
+    volumes:
+      - ./docker/caddy/Caddyfile.${ENVIRONMENT:-dev}:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+      - ${CADDY_LOG_DIR:-./data/logs/caddy}:/var/log/caddy
+    networks:
+      - noctura-net
+    depends_on:
+      - couchdb
+      - obsidian
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 networks:
   noctura-net:
     driver: bridge
+
+volumes:
+  couchdb-data:
+  caddy-data:
+  caddy-config:
+
+secrets:
+  encryption_key:
+    file: ${ENCRYPTION_KEY_FILE:-./data/secrets/encryption_key}
