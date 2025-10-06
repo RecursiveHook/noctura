@@ -1,4 +1,4 @@
-.PHONY: help setup start stop restart logs status backup restore test health clean install-obsidian
+.PHONY: help setup start stop restart logs status backup restore test health clean install-obsidian show-access
 
 help:
 	@echo "Noctura - Obsidian LiveSync with CouchDB"
@@ -12,6 +12,7 @@ help:
 	@echo "  make logs            - View logs (Ctrl+C to exit)"
 	@echo "  make status          - Show service status"
 	@echo "  make health          - Run health checks"
+	@echo "  make show-access     - Display access URLs and connection info"
 	@echo "  make test            - Run integration tests"
 	@echo "  make backup          - Create backup"
 	@echo "  make restore         - Restore from backup (prompts for file)"
@@ -72,3 +73,6 @@ clean-all:
 
 init-db:
 	@./scripts/init-db.sh
+
+show-access:
+	@./scripts/show-access.sh

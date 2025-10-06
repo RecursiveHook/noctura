@@ -60,5 +60,22 @@
 
     "containerEnv": {
         "DEBIAN_FRONTEND": "noninteractive"
+    },
+
+    // Forward ports from Docker containers to the devcontainer
+    "forwardPorts": [8080, 5900, 5984],
+    "portsAttributes": {
+        "8080": {
+            "label": "Obsidian Web (noVNC)",
+            "onAutoForward": "notify"
+        },
+        "5900": {
+            "label": "VNC Server",
+            "onAutoForward": "silent"
+        },
+        "5984": {
+            "label": "CouchDB",
+            "onAutoForward": "notify"
+        }
     }
 }
