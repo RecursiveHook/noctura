@@ -10,6 +10,28 @@ VERSION=$(cat "${PROJECT_ROOT}/VERSION" 2>/dev/null || echo "unknown")
 echo "🔵 Noctura Setup Script v${VERSION}"
 echo "===================================="
 echo ""
+
+if [ ! -f .env ]; then
+    echo "📝 Creating .env file with secure defaults..."
+    COUCHDB_PASSWORD=$(openssl rand -base64 32)
+    VNC_PASSWORD=$(openssl rand -base64 16)
+    ENCRYPTION_KEY=$(openssl rand -base64 32)
+    
+    cat > .env <<EOF
+COUCHDB_USER=admin
+COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+COUCHDB_DATABASE=noctura
+VNC_PASSWORD=${VNC_PASSWORD}
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
+HTTPS_PORT=443
+HTTP_PORT=80
+DOMAIN=localhost
+ENVIRONMENT=dev
+EOF
+    
+    chmod 600 .env
+    
+    echo ""
     echo "🔐 IMPORTANT: Save these credentials securely!"
     echo "=============================================="
     echo "CouchDB Password: $COUCHDB_PASSWORD"

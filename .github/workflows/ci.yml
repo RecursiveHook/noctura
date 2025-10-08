@@ -50,18 +50,19 @@ jobs:
       
       - name: Wait for CouchDB to be ready
         run: |
-          timeout=60
+          max_wait=60
+          elapsed=0
           until curl -sf -k https://localhost/couchdb/_up > /dev/null 2>&1; do
-            timeout=$((timeout - 1))
-            if [ $timeout -le 0 ]; then
-              echo "❌ Timeout waiting for CouchDB"
+            if [ $elapsed -ge $max_wait ]; then
+              echo "❌ Timeout waiting for CouchDB after ${max_wait}s"
               docker compose logs couchdb
               docker compose logs caddy
               docker compose logs gocryptfs
               exit 1
             fi
-            echo "⏳ Waiting for CouchDB... ($timeout seconds remaining)"
+            echo "⏳ Waiting for CouchDB... (${elapsed}s/${max_wait}s)"
             sleep 2
+            elapsed=$((elapsed + 2))
           done
           echo "✅ CouchDB is ready!"
       
@@ -132,20 +133,21 @@ jobs:
       
       - name: Wait for CouchDB
         run: |
-          timeout=60
+          max_wait=60
+          elapsed=0
           until curl -sf -k https://localhost/couchdb/_up > /dev/null 2>&1; do
-            timeout=$((timeout - 1))
-            if [ $timeout -le 0 ]; then
-              echo "Timeout waiting for CouchDB"
+            if [ $elapsed -ge $max_wait ]; then
+              echo "❌ Timeout waiting for CouchDB after ${max_wait}s"
               docker compose logs couchdb
               docker compose logs caddy
               docker compose logs gocryptfs
               exit 1
             fi
-            echo "Waiting for CouchDB... ($timeout seconds remaining)"
+            echo "⏳ Waiting for CouchDB... (${elapsed}s/${max_wait}s)"
             sleep 2
+            elapsed=$((elapsed + 2))
           done
-          echo "CouchDB is ready!"
+          echo "✅ CouchDB is ready!"
       
       - name: Initialize CouchDB system databases
         run: |
