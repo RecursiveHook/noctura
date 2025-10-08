@@ -63,7 +63,7 @@ jobs:
       - name: Wait for services to be healthy
         run: |
           echo "⏳ Waiting for all services to pass healthchecks..."
-          docker compose up --wait --wait-timeout 60
+          docker compose up --wait --wait-timeout 90
           echo "✅ All services are healthy!"
       
       - name: Initialize CouchDB system databases
@@ -107,9 +107,13 @@ jobs:
         if: always()
         run: docker compose ps
       
-      - name: Show CouchDB logs
+      - name: Show service logs
         if: always()
-        run: docker compose logs couchdb
+        run: |
+          echo "=== gocryptfs logs ==="
+          docker compose logs gocryptfs
+          echo "=== CouchDB logs ==="
+          docker compose logs couchdb
       
       - name: Cleanup
         if: always()
@@ -134,7 +138,7 @@ jobs:
       - name: Wait for services to be healthy
         run: |
           echo "⏳ Waiting for all services to pass healthchecks..."
-          docker compose up --wait --wait-timeout 60
+          docker compose up --wait --wait-timeout 90
           echo "✅ All services are healthy!"
       
       - name: Initialize CouchDB system databases
@@ -165,9 +169,13 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Total Tests:** 20" >> $GITHUB_STEP_SUMMARY
       
-      - name: Check CouchDB logs
+      - name: Show service logs
         if: always()
-        run: docker compose logs couchdb
+        run: |
+          echo "=== gocryptfs logs ==="
+          docker compose logs gocryptfs
+          echo "=== CouchDB logs ==="
+          docker compose logs couchdb
       
       - name: Stop services
         if: always()
