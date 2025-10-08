@@ -7,6 +7,15 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:
 
+env:
+  COUCHDB_PASSWORD: test_password_123456789
+  VNC_PASSWORD: test_vnc_password
+  ENCRYPTION_KEY: test_encryption_key_12345678
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   shellcheck:
     name: Shellcheck
@@ -35,12 +44,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
       - name: Create .env file
         run: |
           cp .env.example .env
-          sed -i 's/COUCHDB_PASSWORD=CHANGE_ME/COUCHDB_PASSWORD=test_password_123456789/' .env
-          sed -i 's/VNC_PASSWORD=CHANGE_ME/VNC_PASSWORD=test_vnc_password/' .env
-          sed -i 's/ENCRYPTION_KEY=CHANGE_ME/ENCRYPTION_KEY=test_encryption_key_12345678/' .env
+          sed -i "s/COUCHDB_PASSWORD=CHANGE_ME/COUCHDB_PASSWORD=${COUCHDB_PASSWORD}/" .env
+          sed -i "s/VNC_PASSWORD=CHANGE_ME/VNC_PASSWORD=${VNC_PASSWORD}/" .env
+          sed -i "s/ENCRYPTION_KEY=CHANGE_ME/ENCRYPTION_KEY=${ENCRYPTION_KEY}/" .env
       
       - name: Pull Docker images
         run: docker compose pull
@@ -48,45 +60,17 @@ jobs:
       - name: Build and start services
         run: docker compose up -d --build
       
-      - name: Wait for Caddy proxy to be ready
+      - name: Wait for services to be healthy
         run: |
-          max_wait=45
-          elapsed=0
-          until curl -sf -k https://localhost/ > /dev/null 2>&1; do
-            if [ $elapsed -ge $max_wait ]; then
-              echo "❌ Timeout waiting for Caddy after ${max_wait}s"
-              docker compose logs caddy
-              exit 1
-            fi
-            echo "⏳ Waiting for Caddy proxy... (${elapsed}s/${max_wait}s)"
-            sleep 2
-            elapsed=$((elapsed + 2))
-          done
-          echo "✅ Caddy proxy is ready!"
-      
-      - name: Wait for CouchDB to be ready
-        run: |
-          max_wait=60
-          elapsed=0
-          until curl -sf -k https://localhost/couchdb/_up > /dev/null 2>&1; do
-            if [ $elapsed -ge $max_wait ]; then
-              echo "❌ Timeout waiting for CouchDB after ${max_wait}s"
-              docker compose logs couchdb
-              docker compose logs caddy
-              docker compose logs gocryptfs
-              exit 1
-            fi
-            echo "⏳ Waiting for CouchDB via proxy... (${elapsed}s/${max_wait}s)"
-            sleep 2
-            elapsed=$((elapsed + 2))
-          done
-          echo "✅ CouchDB is ready!"
+          echo "⏳ Waiting for all services to pass healthchecks..."
+          docker compose up --wait --wait-timeout 60
+          echo "✅ All services are healthy!"
       
       - name: Initialize CouchDB system databases
         run: |
           echo "📋 Creating CouchDB system databases..."
-          curl -sf -k -u "admin:test_password_123456789" -X PUT https://localhost/couchdb/_users
-          curl -sf -k -u "admin:test_password_123456789" -X PUT https://localhost/couchdb/_replicator
+          curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users
+          curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator
           echo "✅ System databases created"
       
       - name: Verify CouchDB version
@@ -100,7 +84,7 @@ jobs:
       
       - name: Test authentication
         run: |
-          if curl -sf -k -u "admin:test_password_123456789" https://localhost/couchdb/_all_dbs > /dev/null 2>&1; then
+          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/_all_dbs > /dev/null 2>&1; then
             echo "✅ Authentication successful"
           else
             echo "❌ Authentication failed"
@@ -112,7 +96,7 @@ jobs:
       
       - name: Verify database created
         run: |
-          if curl -sf -k -u "admin:test_password_123456789" https://localhost/couchdb/obsidian > /dev/null 2>&1; then
+          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/obsidian > /dev/null 2>&1; then
             echo "✅ Database 'obsidian' created successfully"
           else
             echo "❌ Database 'obsidian' not found"
@@ -140,52 +124,24 @@ jobs:
       - name: Create .env file
         run: |
           cp .env.example .env
-          sed -i 's/COUCHDB_PASSWORD=CHANGE_ME/COUCHDB_PASSWORD=test_password_123456789/' .env
-          sed -i 's/VNC_PASSWORD=CHANGE_ME/VNC_PASSWORD=test_vnc_password/' .env
-          sed -i 's/ENCRYPTION_KEY=CHANGE_ME/ENCRYPTION_KEY=test_encryption_key_12345678/' .env
+          sed -i "s/COUCHDB_PASSWORD=CHANGE_ME/COUCHDB_PASSWORD=${COUCHDB_PASSWORD}/" .env
+          sed -i "s/VNC_PASSWORD=CHANGE_ME/VNC_PASSWORD=${VNC_PASSWORD}/" .env
+          sed -i "s/ENCRYPTION_KEY=CHANGE_ME/ENCRYPTION_KEY=${ENCRYPTION_KEY}/" .env
       
       - name: Start services
         run: docker compose up -d
       
-      - name: Wait for Caddy proxy
+      - name: Wait for services to be healthy
         run: |
-          max_wait=45
-          elapsed=0
-          until curl -sf -k https://localhost/ > /dev/null 2>&1; do
-            if [ $elapsed -ge $max_wait ]; then
-              echo "❌ Timeout waiting for Caddy after ${max_wait}s"
-              docker compose logs caddy
-              exit 1
-            fi
-            echo "⏳ Waiting for Caddy proxy... (${elapsed}s/${max_wait}s)"
-            sleep 2
-            elapsed=$((elapsed + 2))
-          done
-          echo "✅ Caddy proxy is ready!"
-      
-      - name: Wait for CouchDB
-        run: |
-          max_wait=60
-          elapsed=0
-          until curl -sf -k https://localhost/couchdb/_up > /dev/null 2>&1; do
-            if [ $elapsed -ge $max_wait ]; then
-              echo "❌ Timeout waiting for CouchDB after ${max_wait}s"
-              docker compose logs couchdb
-              docker compose logs caddy
-              docker compose logs gocryptfs
-              exit 1
-            fi
-            echo "⏳ Waiting for CouchDB via proxy... (${elapsed}s/${max_wait}s)"
-            sleep 2
-            elapsed=$((elapsed + 2))
-          done
-          echo "✅ CouchDB is ready!"
+          echo "⏳ Waiting for all services to pass healthchecks..."
+          docker compose up --wait --wait-timeout 60
+          echo "✅ All services are healthy!"
       
       - name: Initialize CouchDB system databases
         run: |
           echo "Creating CouchDB system databases..."
-          curl -sf -k -u "admin:test_password_123456789" -X PUT https://localhost/couchdb/_users
-          curl -sf -k -u "admin:test_password_123456789" -X PUT https://localhost/couchdb/_replicator
+          curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users
+          curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator
           echo "System databases created"
       
       - name: Run health checks

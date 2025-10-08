@@ -22,10 +22,10 @@ services:
       - noctura-net
     healthcheck:
       test: ["CMD", "mountpoint", "-q", "/decrypted"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
 
   couchdb:
     image: couchdb:3.3
@@ -45,10 +45,10 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5984/_up"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
 
   obsidian:
     build:
@@ -77,10 +77,10 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
   caddy:
     image: caddy:2-alpine
@@ -99,12 +99,17 @@ services:
       - caddy-logs:/var/log/caddy
     networks:
       - noctura-net
+    depends_on:
+      couchdb:
+        condition: service_started
+      obsidian:
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
 
 networks:
   noctura-net:
