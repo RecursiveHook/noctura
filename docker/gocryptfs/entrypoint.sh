@@ -26,14 +26,16 @@ if [ ! -f "$ENCRYPTED_DIR/gocryptfs.conf" ]; then
     echo "✅ Encrypted filesystem initialized"
 fi
 
+if mountpoint -q "$DECRYPTED_DIR"; then
+    echo "⚠️  $DECRYPTED_DIR is already mounted, unmounting first..."
+    fusermount -u "$DECRYPTED_DIR" || umount "$DECRYPTED_DIR" || true
+    sleep 1
+fi
+
+if [ -d "$DECRYPTED_DIR" ] && [ "$(ls -A "$DECRYPTED_DIR" 2>/dev/null)" ]; then
+    echo "⚠️  $DECRYPTED_DIR is not empty, clearing stale data before mount..."
+    rm -rf "${DECRYPTED_DIR:?}/"* "${DECRYPTED_DIR:?}/".[!.]* 2>/dev/null || true
+fi
+
 echo "🔓 Mounting encrypted filesystem..."
-gocryptfs $PASSFILE_ARG -allow_other "$ENCRYPTED_DIR" "$DECRYPTED_DIR"
-
-echo "✅ Encrypted filesystem mounted at $DECRYPTED_DIR"
-echo "📊 Keeping container alive..."
-
-trap "echo '🔒 Unmounting...'; fusermount -u $DECRYPTED_DIR; exit 0" SIGTERM SIGINT
-
-while true; do
-    sleep 3600
-done
+exec gocryptfs $PASSFILE_ARG -allow_other -fg "$ENCRYPTED_DIR" "$DECRYPTED_DIR"
