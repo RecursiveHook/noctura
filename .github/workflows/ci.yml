@@ -48,6 +48,22 @@ jobs:
       - name: Build and start services
         run: docker compose up -d --build
       
+      - name: Wait for Caddy proxy to be ready
+        run: |
+          max_wait=30
+          elapsed=0
+          until curl -sf -k https://localhost/ > /dev/null 2>&1; do
+            if [ $elapsed -ge $max_wait ]; then
+              echo "❌ Timeout waiting for Caddy after ${max_wait}s"
+              docker compose logs caddy
+              exit 1
+            fi
+            echo "⏳ Waiting for Caddy proxy... (${elapsed}s/${max_wait}s)"
+            sleep 2
+            elapsed=$((elapsed + 2))
+          done
+          echo "✅ Caddy proxy is ready!"
+      
       - name: Wait for CouchDB to be ready
         run: |
           max_wait=60
@@ -60,7 +76,7 @@ jobs:
               docker compose logs gocryptfs
               exit 1
             fi
-            echo "⏳ Waiting for CouchDB... (${elapsed}s/${max_wait}s)"
+            echo "⏳ Waiting for CouchDB via proxy... (${elapsed}s/${max_wait}s)"
             sleep 2
             elapsed=$((elapsed + 2))
           done
@@ -131,6 +147,22 @@ jobs:
       - name: Start services
         run: docker compose up -d
       
+      - name: Wait for Caddy proxy
+        run: |
+          max_wait=30
+          elapsed=0
+          until curl -sf -k https://localhost/ > /dev/null 2>&1; do
+            if [ $elapsed -ge $max_wait ]; then
+              echo "❌ Timeout waiting for Caddy after ${max_wait}s"
+              docker compose logs caddy
+              exit 1
+            fi
+            echo "⏳ Waiting for Caddy proxy... (${elapsed}s/${max_wait}s)"
+            sleep 2
+            elapsed=$((elapsed + 2))
+          done
+          echo "✅ Caddy proxy is ready!"
+      
       - name: Wait for CouchDB
         run: |
           max_wait=60
@@ -143,7 +175,7 @@ jobs:
               docker compose logs gocryptfs
               exit 1
             fi
-            echo "⏳ Waiting for CouchDB... (${elapsed}s/${max_wait}s)"
+            echo "⏳ Waiting for CouchDB via proxy... (${elapsed}s/${max_wait}s)"
             sleep 2
             elapsed=$((elapsed + 2))
           done
