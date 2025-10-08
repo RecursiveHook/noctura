@@ -1,0 +1,24 @@
+name: 'Setup Environment'
+description: 'Create .env file with test credentials for CI'
+inputs:
+  couchdb_password:
+    description: 'CouchDB admin password'
+    required: true
+  vnc_password:
+    description: 'VNC password'
+    required: true
+  encryption_key:
+    description: 'Encryption key'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Create .env file
+      shell: bash
+      run: |
+        cp .env.example .env
+        sed -i "s/COUCHDB_PASSWORD=CHANGE_ME/COUCHDB_PASSWORD=${{ inputs.couchdb_password }}/" .env
+        sed -i "s/VNC_PASSWORD=CHANGE_ME/VNC_PASSWORD=${{ inputs.vnc_password }}/" .env
+        sed -i "s/ENCRYPTION_KEY=CHANGE_ME/ENCRYPTION_KEY=${{ inputs.encryption_key }}/" .env
+        chmod 600 .env
+        echo "✅ Environment file created"
