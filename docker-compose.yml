@@ -1,5 +1,3 @@
-version: '3.8'
-
 x-noctura-version: &noctura-version "0.1.0"
 
 services:
@@ -16,12 +14,10 @@ services:
     environment:
       - ENCRYPTED_DIR=/encrypted
       - DECRYPTED_DIR=/decrypted
-      - PASSWORD_FILE=/run/secrets/encryption_key
+      - PASSWORD=${ENCRYPTION_KEY}
     volumes:
-      - ${ENCRYPTED_DATA_DIR:-./data/encrypted}:/encrypted
+      - encrypted-data:/encrypted
       - couchdb-data:/decrypted
-    secrets:
-      - encryption_key
     networks:
       - noctura-net
     healthcheck:
@@ -41,7 +37,7 @@ services:
       - NOCTURA_VERSION=0.1.0
     volumes:
       - couchdb-data:/opt/couchdb/data
-      - ${COUCHDB_CONFIG_DIR:-./data/config}:/opt/couchdb/etc/local.d
+      - couchdb-config:/opt/couchdb/etc/local.d
     networks:
       - noctura-net
     depends_on:
@@ -73,7 +69,7 @@ services:
       - DISPLAY=:99
       - NOCTURA_VERSION=0.1.0
     volumes:
-      - ${OBSIDIAN_VAULTS_DIR:-./vaults}:/root/vaults
+      - obsidian-vaults:/root/vaults
     networks:
       - noctura-net
     depends_on:
@@ -100,7 +96,7 @@ services:
       - ./docker/caddy/Caddyfile.${ENVIRONMENT:-dev}:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
-      - ${CADDY_LOG_DIR:-./data/logs/caddy}:/var/log/caddy
+      - caddy-logs:/var/log/caddy
     networks:
       - noctura-net
     depends_on:
@@ -119,9 +115,9 @@ networks:
 
 volumes:
   couchdb-data:
+  couchdb-config:
   caddy-data:
   caddy-config:
-
-secrets:
-  encryption_key:
-    file: ${ENCRYPTION_KEY_FILE:-./data/secrets/encryption_key}
+  caddy-logs:
+  encrypted-data:
+  obsidian-vaults:

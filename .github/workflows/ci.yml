@@ -42,12 +42,6 @@ jobs:
           sed -i 's/VNC_PASSWORD=CHANGE_ME/VNC_PASSWORD=test_vnc_password/' .env
           sed -i 's/ENCRYPTION_KEY=CHANGE_ME/ENCRYPTION_KEY=test_encryption_key_12345678/' .env
       
-      - name: Create data directories and encryption key
-        run: |
-          mkdir -p data/config data/encrypted data/secrets data/logs/caddy backups vaults
-          echo "test_encryption_key_12345678" > data/secrets/encryption_key
-          chmod 600 data/secrets/encryption_key
-      
       - name: Pull Docker images
         run: docker compose pull
       
@@ -70,6 +64,13 @@ jobs:
             sleep 2
           done
           echo "✅ CouchDB is ready!"
+      
+      - name: Initialize CouchDB system databases
+        run: |
+          echo "📋 Creating CouchDB system databases..."
+          curl -sf -k -u "admin:test_password_123456789" -X PUT https://localhost/couchdb/_users
+          curl -sf -k -u "admin:test_password_123456789" -X PUT https://localhost/couchdb/_replicator
+          echo "✅ System databases created"
       
       - name: Verify CouchDB version
         run: |
@@ -126,12 +127,6 @@ jobs:
           sed -i 's/VNC_PASSWORD=CHANGE_ME/VNC_PASSWORD=test_vnc_password/' .env
           sed -i 's/ENCRYPTION_KEY=CHANGE_ME/ENCRYPTION_KEY=test_encryption_key_12345678/' .env
       
-      - name: Create data directories and encryption key
-        run: |
-          mkdir -p data/config data/encrypted data/secrets data/logs/caddy backups vaults
-          echo "test_encryption_key_12345678" > data/secrets/encryption_key
-          chmod 600 data/secrets/encryption_key
-      
       - name: Start services
         run: docker compose up -d
       
@@ -151,6 +146,13 @@ jobs:
             sleep 2
           done
           echo "CouchDB is ready!"
+      
+      - name: Initialize CouchDB system databases
+        run: |
+          echo "Creating CouchDB system databases..."
+          curl -sf -k -u "admin:test_password_123456789" -X PUT https://localhost/couchdb/_users
+          curl -sf -k -u "admin:test_password_123456789" -X PUT https://localhost/couchdb/_replicator
+          echo "System databases created"
       
       - name: Run health checks
         run: ./scripts/health-check.sh
