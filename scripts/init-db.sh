@@ -22,14 +22,19 @@ COUCHDB_USER=${COUCHDB_USER:-admin}
 COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
 DB_NAME=${1:-obsidian}
 
-# Determine protocol and URL based on whether Caddy is being used
-if docker compose ps caddy 2>/dev/null | grep -q "Up"; then
-    COUCHDB_URL="https://localhost/couchdb"
-    CURL_OPTS="-k"
-else
-    COUCHDB_URL="http://localhost:${COUCHDB_PORT}"
-    CURL_OPTS=""
+# Use COUCHDB_URL and CURL_OPTS from environment if set (e.g., in CI)
+# Otherwise, determine based on whether Caddy is being used
+if [ -z "${COUCHDB_URL:-}" ]; then
+    if docker compose ps caddy 2>/dev/null | grep -q "Up"; then
+        COUCHDB_URL="https://localhost/couchdb"
+        CURL_OPTS="-k"
+    else
+        COUCHDB_URL="http://localhost:${COUCHDB_PORT}"
+        CURL_OPTS=""
+    fi
 fi
+
+CURL_OPTS=${CURL_OPTS:-""}
 
 echo "Initializing database: $DB_NAME"
 echo "Using endpoint: $COUCHDB_URL"
