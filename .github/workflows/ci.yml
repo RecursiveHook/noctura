@@ -69,8 +69,8 @@ jobs:
       - name: Initialize CouchDB system databases
         run: |
           echo "📋 Creating CouchDB system databases..."
-          docker compose exec -T couchdb curl -sf -u "admin:${COUCHDB_PASSWORD}" -X PUT http://localhost:5984/_users || echo "_users may already exist"
-          docker compose exec -T couchdb curl -sf -u "admin:${COUCHDB_PASSWORD}" -X PUT http://localhost:5984/_replicator || echo "_replicator may already exist"
+          curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users || echo "_users may already exist"
+          curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator || echo "_replicator may already exist"
           echo "✅ System databases initialization complete"
       
       - name: Verify CouchDB version
@@ -144,8 +144,8 @@ jobs:
       - name: Initialize CouchDB system databases
         run: |
           echo "Creating CouchDB system databases..."
-          docker compose exec -T couchdb curl -sf -u "admin:${COUCHDB_PASSWORD}" -X PUT http://localhost:5984/_users || echo "_users may already exist"
-          docker compose exec -T couchdb curl -sf -u "admin:${COUCHDB_PASSWORD}" -X PUT http://localhost:5984/_replicator || echo "_replicator may already exist"
+          curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users || echo "_users may already exist"
+          curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator || echo "_replicator may already exist"
           echo "System databases initialization complete"
       
       - name: Run health checks
