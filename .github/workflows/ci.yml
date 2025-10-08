@@ -76,18 +76,43 @@ jobs:
       
       - name: Initialize CouchDB system databases
         run: |
+          echo "::group::Creating CouchDB system databases"
           echo "📋 Creating CouchDB system databases..."
-          if ! curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users; then
-            echo "⚠️  _users database may already exist or failed to create"
+          
+          # Create _users database
+          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users; then
+            echo "✅ _users database created"
+          else
+            # Check if it already exists
+            if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/_users > /dev/null 2>&1; then
+              echo "⚠️  _users database already exists"
+            else
+              echo "::error::Failed to create _users database"
+              docker compose logs couchdb
+              exit 1
+            fi
           fi
-          if ! curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator; then
-            echo "⚠️  _replicator database may already exist or failed to create"
+          
+          # Create _replicator database
+          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator; then
+            echo "✅ _replicator database created"
+          else
+            # Check if it already exists
+            if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/_replicator > /dev/null 2>&1; then
+              echo "⚠️  _replicator database already exists"
+            else
+              echo "::error::Failed to create _replicator database"
+              docker compose logs couchdb
+              exit 1
+            fi
           fi
+          
           echo "✅ System databases initialization complete"
+          echo "::endgroup::"
       
       - name: Verify CouchDB version
         run: |
-          VERSION=$(curl -sk https://localhost/couchdb/ | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
+          VERSION=$(curl -sk -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/ | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
           echo "CouchDB version: $VERSION"
           echo "couchdb_version=$VERSION" >> $GITHUB_OUTPUT
           if [ -z "$VERSION" ]; then
@@ -176,12 +201,35 @@ jobs:
       - name: Initialize CouchDB system databases
         run: |
           echo "Creating CouchDB system databases..."
-          if ! curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users; then
-            echo "⚠️  _users database may already exist or failed to create"
+          
+          # Create _users database
+          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users; then
+            echo "✅ _users database created"
+          else
+            # Check if it already exists
+            if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/_users > /dev/null 2>&1; then
+              echo "⚠️  _users database already exists"
+            else
+              echo "::error::Failed to create _users database"
+              docker compose logs couchdb
+              exit 1
+            fi
           fi
-          if ! curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator; then
-            echo "⚠️  _replicator database may already exist or failed to create"
+          
+          # Create _replicator database
+          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator; then
+            echo "✅ _replicator database created"
+          else
+            # Check if it already exists
+            if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/_replicator > /dev/null 2>&1; then
+              echo "⚠️  _replicator database already exists"
+            else
+              echo "::error::Failed to create _replicator database"
+              docker compose logs couchdb
+              exit 1
+            fi
           fi
+          
           echo "System databases initialization complete"
       
       - name: Run health checks
