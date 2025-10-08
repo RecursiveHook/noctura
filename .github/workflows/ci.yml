@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@master
+        uses: ludeeus/action-shellcheck@2.0.0
         with:
           scandir: './scripts'
           severity: warning
@@ -69,8 +69,12 @@ jobs:
       - name: Initialize CouchDB system databases
         run: |
           echo "📋 Creating CouchDB system databases..."
-          curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users || echo "_users may already exist"
-          curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator || echo "_replicator may already exist"
+          if ! curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users; then
+            echo "⚠️  _users database may already exist or failed to create"
+          fi
+          if ! curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator; then
+            echo "⚠️  _replicator database may already exist or failed to create"
+          fi
           echo "✅ System databases initialization complete"
       
       - name: Verify CouchDB version
@@ -144,8 +148,12 @@ jobs:
       - name: Initialize CouchDB system databases
         run: |
           echo "Creating CouchDB system databases..."
-          curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users || echo "_users may already exist"
-          curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator || echo "_replicator may already exist"
+          if ! curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users; then
+            echo "⚠️  _users database may already exist or failed to create"
+          fi
+          if ! curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator; then
+            echo "⚠️  _replicator database may already exist or failed to create"
+          fi
           echo "System databases initialization complete"
       
       - name: Run health checks
