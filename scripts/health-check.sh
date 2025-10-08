@@ -41,11 +41,10 @@ check_file() {
 check_directory() {
     if [ -d "$1" ]; then
         echo -e "${GREEN}✓${NC} $1 exists"
-        return 0
     else
         echo -e "${YELLOW}⚠${NC} $1 not found (will be created on setup)"
-        return 1
     fi
+    return 0
 }
 
 echo "📋 Checking Prerequisites..."
