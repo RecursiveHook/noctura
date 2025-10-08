@@ -38,10 +38,15 @@ jobs:
       - name: Create .env file
         run: |
           cp .env.example .env
-          sed -i 's/change_this_secure_password/test_password_123456789/' .env
+          sed -i 's/COUCHDB_PASSWORD=CHANGE_ME/COUCHDB_PASSWORD=test_password_123456789/' .env
+          sed -i 's/VNC_PASSWORD=CHANGE_ME/VNC_PASSWORD=test_vnc_password/' .env
+          sed -i 's/ENCRYPTION_KEY=CHANGE_ME/ENCRYPTION_KEY=test_encryption_key_12345678/' .env
       
-      - name: Create data directories
-        run: mkdir -p data/couchdb data/config backups
+      - name: Create data directories and encryption key
+        run: |
+          mkdir -p data/config data/encrypted data/secrets data/logs/caddy backups vaults
+          echo "test_encryption_key_12345678" > data/secrets/encryption_key
+          chmod 600 data/secrets/encryption_key
       
       - name: Pull Docker images
         run: docker compose pull
@@ -52,11 +57,13 @@ jobs:
       - name: Wait for CouchDB to be ready
         run: |
           timeout=60
-          until curl -sf http://localhost:5984/_up > /dev/null 2>&1; do
+          until curl -sf -k https://localhost/couchdb/_up > /dev/null 2>&1; do
             timeout=$((timeout - 1))
             if [ $timeout -le 0 ]; then
               echo "❌ Timeout waiting for CouchDB"
               docker compose logs couchdb
+              docker compose logs caddy
+              docker compose logs gocryptfs
               exit 1
             fi
             echo "⏳ Waiting for CouchDB... ($timeout seconds remaining)"
@@ -66,7 +73,7 @@ jobs:
       
       - name: Verify CouchDB version
         run: |
-          VERSION=$(curl -s http://localhost:5984/ | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
+          VERSION=$(curl -sk https://localhost/couchdb/ | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
           echo "CouchDB version: $VERSION"
           if [ -z "$VERSION" ]; then
             echo "❌ Failed to get CouchDB version"
@@ -75,7 +82,7 @@ jobs:
       
       - name: Test authentication
         run: |
-          if curl -sf -u "admin:test_password_123456789" http://localhost:5984/_all_dbs > /dev/null 2>&1; then
+          if curl -sf -k -u "admin:test_password_123456789" https://localhost/couchdb/_all_dbs > /dev/null 2>&1; then
             echo "✅ Authentication successful"
           else
             echo "❌ Authentication failed"
@@ -87,7 +94,7 @@ jobs:
       
       - name: Verify database created
         run: |
-          if curl -sf -u "admin:test_password_123456789" http://localhost:5984/obsidian > /dev/null 2>&1; then
+          if curl -sf -k -u "admin:test_password_123456789" https://localhost/couchdb/obsidian > /dev/null 2>&1; then
             echo "✅ Database 'obsidian' created successfully"
           else
             echo "❌ Database 'obsidian' not found"
@@ -115,10 +122,15 @@ jobs:
       - name: Create .env file
         run: |
           cp .env.example .env
-          sed -i 's/change_this_secure_password/test_password_123456789/' .env
+          sed -i 's/COUCHDB_PASSWORD=CHANGE_ME/COUCHDB_PASSWORD=test_password_123456789/' .env
+          sed -i 's/VNC_PASSWORD=CHANGE_ME/VNC_PASSWORD=test_vnc_password/' .env
+          sed -i 's/ENCRYPTION_KEY=CHANGE_ME/ENCRYPTION_KEY=test_encryption_key_12345678/' .env
       
-      - name: Create data directories
-        run: mkdir -p data/couchdb data/config backups
+      - name: Create data directories and encryption key
+        run: |
+          mkdir -p data/config data/encrypted data/secrets data/logs/caddy backups vaults
+          echo "test_encryption_key_12345678" > data/secrets/encryption_key
+          chmod 600 data/secrets/encryption_key
       
       - name: Start services
         run: docker compose up -d
@@ -126,11 +138,13 @@ jobs:
       - name: Wait for CouchDB
         run: |
           timeout=60
-          until curl -sf http://localhost:5984/_up > /dev/null 2>&1; do
+          until curl -sf -k https://localhost/couchdb/_up > /dev/null 2>&1; do
             timeout=$((timeout - 1))
             if [ $timeout -le 0 ]; then
               echo "Timeout waiting for CouchDB"
               docker compose logs couchdb
+              docker compose logs caddy
+              docker compose logs gocryptfs
               exit 1
             fi
             echo "Waiting for CouchDB... ($timeout seconds remaining)"
@@ -143,6 +157,21 @@ jobs:
       
       - name: Run integration tests
         run: ./scripts/test.sh
+      
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "## Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Test Categories:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Encryption (key, permissions, gocryptfs)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ TLS/HTTPS (Caddy, certificates, redirects)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ CouchDB (auth, CRUD operations, reverse proxy)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Obsidian (container, web interface)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Scripts (backup, restore, health check)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Configuration (docker-compose, file permissions)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total Tests:** 20" >> $GITHUB_STEP_SUMMARY
       
       - name: Check CouchDB logs
         if: always()

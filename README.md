@@ -1,5 +1,9 @@
 # Noctura
 
+[![CI](https://github.com/RecursiveHook/noctura/actions/workflows/ci.yml/badge.svg)](https://github.com/RecursiveHook/noctura/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/RecursiveHook/noctura/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 Turnkey containerized deployment for Obsidian with Self-Hosted LiveSync via CouchDB. Easy to deploy, manage, backup, and migrate your personal knowledge base.
 
 ## Features
@@ -357,16 +361,64 @@ Areas needing help:
 
 ## Testing
 
-The project includes comprehensive tests:
+The project includes comprehensive test coverage with **20 automated tests**:
 
+### Test Categories
+
+1. **Encryption Tests** (3 tests)
+   - Encryption key file existence
+   - Key file permissions (600)
+   - Key size validation (≥32 bytes)
+
+2. **Gocryptfs Container** (2 tests)
+   - Container running status
+   - Encrypted mount point validation
+
+3. **TLS/HTTPS Tests** (4 tests)
+   - Caddy reverse proxy health
+   - HTTP to HTTPS redirect
+   - HTTPS endpoint accessibility
+   - TLS certificate validation
+
+4. **CouchDB Tests** (5 tests)
+   - CouchDB via reverse proxy
+   - Authentication
+   - Database creation
+   - Document creation/retrieval
+   - Database cleanup
+
+5. **Obsidian Tests** (2 tests)
+   - Container running status
+   - Web interface via HTTPS
+
+6. **Script Tests** (4 tests)
+   - Backup script validation
+   - Restore script validation
+   - Health check script
+   - Encryption init script
+
+7. **Configuration Tests** (2 tests)
+   - Docker Compose validation
+   - .env file permissions (600)
+
+### Running Tests
+
+```bash
+make test              # Run all tests
+./scripts/test.sh      # Direct script execution
+./scripts/health-check.sh  # Health checks only
+```
+
+### CI/CD
+
+GitHub Actions automatically runs all tests on push/PR:
 - **Shellcheck**: Validates shell script quality
 - **Docker validation**: Ensures compose file is valid
-- **Integration tests**: Full CouchDB CRUD operations
-- **Security tests**: Encryption, TLS, and file permissions validation
-- **Service health**: Container status and connectivity checks
-- **HTTPS verification**: TLS protocol and certificate validation
+- **Build tests**: Verifies container builds
+- **Integration tests**: Full system testing (20 tests)
+- **Markdown lint**: Documentation quality
 
-GitHub Actions automatically runs all tests on push/PR.
+View test results: [![CI](https://github.com/RecursiveHook/noctura/actions/workflows/ci.yml/badge.svg)](https://github.com/RecursiveHook/noctura/actions/workflows/ci.yml)
 
 ## License
 

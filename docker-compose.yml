@@ -1,5 +1,7 @@
 version: '3.8'
 
+x-noctura-version: &noctura-version "0.1.0"
+
 services:
   gocryptfs:
     build:
@@ -36,6 +38,7 @@ services:
     environment:
       - COUCHDB_USER=${COUCHDB_USER:-admin}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      - NOCTURA_VERSION=0.1.0
     volumes:
       - couchdb-data:/opt/couchdb/data
       - ${COUCHDB_CONFIG_DIR:-./data/config}:/opt/couchdb/etc/local.d
@@ -68,6 +71,7 @@ services:
       - COUCHDB_DATABASE=${COUCHDB_DATABASE:-noctura}
       - VNC_PASSWORD=${VNC_PASSWORD}
       - DISPLAY=:99
+      - NOCTURA_VERSION=0.1.0
     volumes:
       - ${OBSIDIAN_VAULTS_DIR:-./vaults}:/root/vaults
     networks:

@@ -5,55 +5,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-echo "🔵 Noctura Setup Script"
-echo "======================="
+VERSION=$(cat "${PROJECT_ROOT}/VERSION" 2>/dev/null || echo "unknown")
 
-if ! command -v docker &> /dev/null; then
-    echo "❌ Error: Docker is not installed or not in PATH"
-    exit 1
-fi
-
-if ! command -v docker compose &> /dev/null && ! docker compose version &> /dev/null; then
-    echo "❌ Error: Docker Compose is not available"
-    exit 1
-fi
-
-if ! command -v openssl &> /dev/null; then
-    echo "❌ Error: openssl is not installed (required for password generation)"
-    exit 1
-fi
-
-generate_password() {
-    openssl rand -base64 32 | tr -d "=+/" | cut -c1-32
-}
-
-if [ ! -f .env ]; then
-    echo "📝 Creating .env file from template..."
-    if [ ! -f .env.example ]; then
-        echo "❌ Error: .env.example not found"
-        exit 1
-    fi
-    cp .env.example .env
-    
-    echo "🔑 Generating secure passwords..."
-    COUCHDB_PASSWORD=$(generate_password)
-    VNC_PASSWORD=$(generate_password)
-    ENCRYPTION_KEY=$(generate_password)
-    
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' "s/COUCHDB_PASSWORD=CHANGE_ME/COUCHDB_PASSWORD=$COUCHDB_PASSWORD/" .env
-        sed -i '' "s/VNC_PASSWORD=CHANGE_ME/VNC_PASSWORD=$VNC_PASSWORD/" .env
-        sed -i '' "s/ENCRYPTION_KEY=CHANGE_ME/ENCRYPTION_KEY=$ENCRYPTION_KEY/" .env
-    else
-        sed -i "s/COUCHDB_PASSWORD=CHANGE_ME/COUCHDB_PASSWORD=$COUCHDB_PASSWORD/" .env
-        sed -i "s/VNC_PASSWORD=CHANGE_ME/VNC_PASSWORD=$VNC_PASSWORD/" .env
-        sed -i "s/ENCRYPTION_KEY=CHANGE_ME/ENCRYPTION_KEY=$ENCRYPTION_KEY/" .env
-    fi
-    
-    chmod 600 .env
-    
-    echo "✅ Generated secure passwords"
-    echo ""
+echo "🔵 Noctura Setup Script v${VERSION}"
+echo "===================================="
+echo ""
     echo "🔐 IMPORTANT: Save these credentials securely!"
     echo "=============================================="
     echo "CouchDB Password: $COUCHDB_PASSWORD"
