@@ -74,6 +74,32 @@ jobs:
           docker compose up --wait --wait-timeout 90
           echo "✅ All services are healthy!"
       
+      - name: Wait for Caddy HTTPS endpoint
+        run: |
+          echo "⏳ Waiting for Caddy HTTPS endpoint to be ready..."
+          for i in {1..30}; do
+            if curl -sk https://localhost/ > /dev/null 2>&1; then
+              echo "✅ Caddy HTTPS is ready!"
+              exit 0
+            fi
+            echo "  Attempt $i/30: Waiting..."
+            sleep 2
+          done
+          echo "::error::Caddy HTTPS endpoint not ready after 60 seconds"
+          docker compose logs caddy
+          exit 1
+      
+      - name: Verify CouchDB accessibility
+        run: |
+          echo "🔍 Testing CouchDB accessibility..."
+          echo "Testing root endpoint:"
+          if curl -sk -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/ | jq .; then
+            echo "✅ CouchDB root accessible"
+          else
+            echo "::error::Cannot access CouchDB root"
+            exit 1
+          fi
+      
       - name: Initialize CouchDB system databases
         run: |
           echo "::group::Creating CouchDB system databases"
@@ -88,6 +114,8 @@ jobs:
               echo "⚠️  _users database already exists"
             else
               echo "::error::Failed to create _users database"
+              echo "Attempting to get error details:"
+              curl -sk -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users || true
               docker compose logs couchdb
               exit 1
             fi
@@ -102,6 +130,8 @@ jobs:
               echo "⚠️  _replicator database already exists"
             else
               echo "::error::Failed to create _replicator database"
+              echo "Attempting to get error details:"
+              curl -sk -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator || true
               docker compose logs couchdb
               exit 1
             fi
@@ -198,6 +228,21 @@ jobs:
           docker compose up --wait --wait-timeout 90
           echo "✅ All services are healthy!"
       
+      - name: Wait for Caddy HTTPS endpoint
+        run: |
+          echo "⏳ Waiting for Caddy HTTPS endpoint to be ready..."
+          for i in {1..30}; do
+            if curl -sk https://localhost/ > /dev/null 2>&1; then
+              echo "✅ Caddy HTTPS is ready!"
+              exit 0
+            fi
+            echo "  Attempt $i/30: Waiting..."
+            sleep 2
+          done
+          echo "::error::Caddy HTTPS endpoint not ready after 60 seconds"
+          docker compose logs caddy
+          exit 1
+      
       - name: Initialize CouchDB system databases
         run: |
           echo "Creating CouchDB system databases..."
@@ -211,6 +256,7 @@ jobs:
               echo "⚠️  _users database already exists"
             else
               echo "::error::Failed to create _users database"
+              curl -sk -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users || true
               docker compose logs couchdb
               exit 1
             fi
@@ -225,6 +271,7 @@ jobs:
               echo "⚠️  _replicator database already exists"
             else
               echo "::error::Failed to create _replicator database"
+              curl -sk -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator || true
               docker compose logs couchdb
               exit 1
             fi
