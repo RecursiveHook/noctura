@@ -93,7 +93,7 @@ echo ""
 echo "🐳 Checking Docker Services..."
 
 if docker compose ps 2>/dev/null | grep -q "noctura-couchdb"; then
-    CONTAINER_STATUS=$(docker compose ps noctura-couchdb --format json 2>/dev/null | grep -o '"State":"[^"]*"' | head -n1 | cut -d'"' -f4 || echo "unknown")
+    CONTAINER_STATUS=$(docker inspect noctura-couchdb --format='{{.State.Status}}' 2>/dev/null || echo "unknown")
     
     if [ "$CONTAINER_STATUS" == "running" ]; then
         echo -e "${GREEN}✓${NC} CouchDB container is running"
@@ -132,7 +132,7 @@ else
 fi
 
 if docker compose ps 2>/dev/null | grep -q "noctura-obsidian"; then
-    OBSIDIAN_STATUS=$(docker compose ps noctura-obsidian --format json 2>/dev/null | grep -o '"State":"[^"]*"' | head -n1 | cut -d'"' -f4 || echo "unknown")
+    OBSIDIAN_STATUS=$(docker inspect noctura-obsidian --format='{{.State.Status}}' 2>/dev/null || echo "unknown")
     
     if [ "$OBSIDIAN_STATUS" == "running" ]; then
         echo -e "${GREEN}✓${NC} Obsidian container is running"
