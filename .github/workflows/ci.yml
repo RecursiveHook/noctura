@@ -70,9 +70,23 @@ jobs:
       
       - name: Wait for services to be healthy
         run: |
-          echo "⏳ Waiting for all services to pass healthchecks (including Caddy HTTPS)..."
+          echo "⏳ Waiting for all services to pass healthchecks..."
           docker compose up --wait --wait-timeout 120
           echo "✅ All services are healthy!"
+      
+      - name: Warm up Caddy HTTPS
+        run: |
+          echo "🔐 Warming up Caddy HTTPS (triggers cert generation)..."
+          for i in $(seq 1 30); do
+            if curl -sf -k https://localhost/ > /dev/null 2>&1; then
+              echo "✅ Caddy HTTPS is ready"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "⚠️  HTTPS warmup timed out, but continuing (will fall back to direct CouchDB access)"
+            fi
+            sleep 1
+          done
       
       - name: Determine CouchDB access method
         run: |
@@ -195,6 +209,9 @@ jobs:
           echo "::group::CouchDB logs"
           docker compose logs couchdb
           echo "::endgroup::"
+          echo "::group::Caddy logs"
+          docker compose logs caddy
+          echo "::endgroup::"
       
       - name: Cleanup
         if: always()
@@ -226,9 +243,23 @@ jobs:
       
       - name: Wait for services to be healthy
         run: |
-          echo "⏳ Waiting for all services to pass healthchecks (including Caddy HTTPS)..."
+          echo "⏳ Waiting for all services to pass healthchecks..."
           docker compose up --wait --wait-timeout 120
           echo "✅ All services are healthy!"
+      
+      - name: Warm up Caddy HTTPS
+        run: |
+          echo "🔐 Warming up Caddy HTTPS (triggers cert generation)..."
+          for i in $(seq 1 30); do
+            if curl -sf -k https://localhost/ > /dev/null 2>&1; then
+              echo "✅ Caddy HTTPS is ready"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "⚠️  HTTPS warmup timed out, but continuing (will fall back to direct CouchDB access)"
+            fi
+            sleep 1
+          done
       
       - name: Determine CouchDB access method
         run: |
@@ -347,6 +378,9 @@ jobs:
           echo "::endgroup::"
           echo "::group::CouchDB logs"
           docker compose logs couchdb
+          echo "::endgroup::"
+          echo "::group::Caddy logs"
+          docker compose logs caddy
           echo "::endgroup::"
       
       - name: Stop services
