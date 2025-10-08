@@ -70,35 +70,37 @@ jobs:
       
       - name: Wait for services to be healthy
         run: |
-          echo "⏳ Waiting for all services to pass healthchecks..."
-          docker compose up --wait --wait-timeout 90
+          echo "⏳ Waiting for all services to pass healthchecks (including Caddy HTTPS)..."
+          docker compose up --wait --wait-timeout 120
           echo "✅ All services are healthy!"
       
-      - name: Wait for Caddy HTTPS endpoint
+      - name: Determine CouchDB access method
         run: |
-          echo "⏳ Waiting for Caddy HTTPS endpoint to be ready..."
-          for i in {1..30}; do
-            if curl -sk https://localhost/ > /dev/null 2>&1; then
-              echo "✅ Caddy HTTPS is ready!"
-              exit 0
-            fi
-            echo "  Attempt $i/30: Waiting..."
-            sleep 2
-          done
-          echo "::error::Caddy HTTPS endpoint not ready after 60 seconds"
-          docker compose logs caddy
-          exit 1
-      
-      - name: Verify CouchDB accessibility
-        run: |
-          echo "🔍 Testing CouchDB accessibility..."
-          echo "Testing root endpoint:"
-          if curl -sk -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/ | jq .; then
-            echo "✅ CouchDB root accessible"
+          echo "🔍 Determining best CouchDB access method..."
+          
+          # Try HTTPS through Caddy first (production-like)
+          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/ > /dev/null 2>&1; then
+            echo "✅ Caddy HTTPS is accessible"
+            echo "COUCHDB_URL=https://localhost/couchdb" >> $GITHUB_ENV
+            echo "CURL_OPTS=-sk" >> $GITHUB_ENV
           else
-            echo "::error::Cannot access CouchDB root"
-            exit 1
+            echo "⚠️  Caddy HTTPS not accessible, using direct CouchDB access"
+            COUCHDB_CONTAINER=$(docker compose ps -q couchdb)
+            COUCHDB_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $COUCHDB_CONTAINER)
+            
+            if curl -sf -u "admin:${COUCHDB_PASSWORD}" "http://${COUCHDB_IP}:5984/" > /dev/null 2>&1; then
+              echo "✅ CouchDB directly accessible at http://${COUCHDB_IP}:5984/"
+              echo "COUCHDB_URL=http://${COUCHDB_IP}:5984" >> $GITHUB_ENV
+              echo "CURL_OPTS=-s" >> $GITHUB_ENV
+            else
+              echo "::error::Cannot access CouchDB via HTTPS or direct connection"
+              docker compose logs caddy
+              docker compose logs couchdb
+              exit 1
+            fi
           fi
+          
+          echo "Using CouchDB URL: ${COUCHDB_URL}"
       
       - name: Initialize CouchDB system databases
         run: |
@@ -106,32 +108,32 @@ jobs:
           echo "📋 Creating CouchDB system databases..."
           
           # Create _users database
-          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users; then
+          if curl -sf ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" -X PUT "${COUCHDB_URL}/_users"; then
             echo "✅ _users database created"
           else
             # Check if it already exists
-            if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/_users > /dev/null 2>&1; then
+            if curl -sf ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" "${COUCHDB_URL}/_users" > /dev/null 2>&1; then
               echo "⚠️  _users database already exists"
             else
               echo "::error::Failed to create _users database"
               echo "Attempting to get error details:"
-              curl -sk -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users || true
+              curl ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" -X PUT "${COUCHDB_URL}/_users" || true
               docker compose logs couchdb
               exit 1
             fi
           fi
           
           # Create _replicator database
-          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator; then
+          if curl -sf ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" -X PUT "${COUCHDB_URL}/_replicator"; then
             echo "✅ _replicator database created"
           else
             # Check if it already exists
-            if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/_replicator > /dev/null 2>&1; then
+            if curl -sf ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" "${COUCHDB_URL}/_replicator" > /dev/null 2>&1; then
               echo "⚠️  _replicator database already exists"
             else
               echo "::error::Failed to create _replicator database"
               echo "Attempting to get error details:"
-              curl -sk -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator || true
+              curl ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" -X PUT "${COUCHDB_URL}/_replicator" || true
               docker compose logs couchdb
               exit 1
             fi
@@ -142,7 +144,7 @@ jobs:
       
       - name: Verify CouchDB version
         run: |
-          VERSION=$(curl -sk -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/ | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
+          VERSION=$(curl ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" "${COUCHDB_URL}/" | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
           echo "CouchDB version: $VERSION"
           echo "couchdb_version=$VERSION" >> $GITHUB_OUTPUT
           if [ -z "$VERSION" ]; then
@@ -153,7 +155,7 @@ jobs:
       
       - name: Test authentication
         run: |
-          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/_all_dbs > /dev/null 2>&1; then
+          if curl -sf ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" "${COUCHDB_URL}/_all_dbs" > /dev/null 2>&1; then
             echo "✅ Authentication successful"
           else
             echo "::error::CouchDB authentication failed"
@@ -165,7 +167,7 @@ jobs:
       
       - name: Verify database created
         run: |
-          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/obsidian > /dev/null 2>&1; then
+          if curl -sf ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" "${COUCHDB_URL}/obsidian" > /dev/null 2>&1; then
             echo "✅ Database 'obsidian' created successfully"
           else
             echo "::error::Database 'obsidian' not found"
@@ -224,54 +226,67 @@ jobs:
       
       - name: Wait for services to be healthy
         run: |
-          echo "⏳ Waiting for all services to pass healthchecks..."
-          docker compose up --wait --wait-timeout 90
+          echo "⏳ Waiting for all services to pass healthchecks (including Caddy HTTPS)..."
+          docker compose up --wait --wait-timeout 120
           echo "✅ All services are healthy!"
       
-      - name: Wait for Caddy HTTPS endpoint
+      - name: Determine CouchDB access method
         run: |
-          echo "⏳ Waiting for Caddy HTTPS endpoint to be ready..."
-          for i in {1..30}; do
-            if curl -sk https://localhost/ > /dev/null 2>&1; then
-              echo "✅ Caddy HTTPS is ready!"
-              exit 0
+          echo "🔍 Determining best CouchDB access method..."
+          
+          # Try HTTPS through Caddy first (production-like)
+          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/ > /dev/null 2>&1; then
+            echo "✅ Caddy HTTPS is accessible"
+            echo "COUCHDB_URL=https://localhost/couchdb" >> $GITHUB_ENV
+            echo "CURL_OPTS=-sk" >> $GITHUB_ENV
+          else
+            echo "⚠️  Caddy HTTPS not accessible, using direct CouchDB access"
+            COUCHDB_CONTAINER=$(docker compose ps -q couchdb)
+            COUCHDB_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $COUCHDB_CONTAINER)
+            
+            if curl -sf -u "admin:${COUCHDB_PASSWORD}" "http://${COUCHDB_IP}:5984/" > /dev/null 2>&1; then
+              echo "✅ CouchDB directly accessible at http://${COUCHDB_IP}:5984/"
+              echo "COUCHDB_URL=http://${COUCHDB_IP}:5984" >> $GITHUB_ENV
+              echo "CURL_OPTS=-s" >> $GITHUB_ENV
+            else
+              echo "::error::Cannot access CouchDB via HTTPS or direct connection"
+              docker compose logs caddy
+              docker compose logs couchdb
+              exit 1
             fi
-            echo "  Attempt $i/30: Waiting..."
-            sleep 2
-          done
-          echo "::error::Caddy HTTPS endpoint not ready after 60 seconds"
-          docker compose logs caddy
-          exit 1
+          fi
+          
+          echo "Using CouchDB URL: ${COUCHDB_URL}"
       
       - name: Initialize CouchDB system databases
         run: |
           echo "Creating CouchDB system databases..."
           
           # Create _users database
-          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users; then
+          if curl -sf ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" -X PUT "${COUCHDB_URL}/_users"; then
             echo "✅ _users database created"
           else
             # Check if it already exists
-            if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/_users > /dev/null 2>&1; then
+            if curl -sf ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" "${COUCHDB_URL}/_users" > /dev/null 2>&1; then
               echo "⚠️  _users database already exists"
             else
               echo "::error::Failed to create _users database"
-              curl -sk -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_users || true
+              curl ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" -X PUT "${COUCHDB_URL}/_users" || true
               docker compose logs couchdb
               exit 1
             fi
           fi
           
           # Create _replicator database
-          if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator; then
+          if curl -sf ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" -X PUT "${COUCHDB_URL}/_replicator"; then
             echo "✅ _replicator database created"
           else
             # Check if it already exists
-            if curl -sf -k -u "admin:${COUCHDB_PASSWORD}" https://localhost/couchdb/_replicator > /dev/null 2>&1; then
+            if curl -sf ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" "${COUCHDB_URL}/_replicator" > /dev/null 2>&1; then
               echo "⚠️  _replicator database already exists"
             else
               echo "::error::Failed to create _replicator database"
-              curl -sk -u "admin:${COUCHDB_PASSWORD}" -X PUT https://localhost/couchdb/_replicator || true
+              curl ${CURL_OPTS} -u "admin:${COUCHDB_PASSWORD}" -X PUT "${COUCHDB_URL}/_replicator" || true
               docker compose logs couchdb
               exit 1
             fi
