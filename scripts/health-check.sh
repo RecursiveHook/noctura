@@ -188,11 +188,15 @@ else
     echo -e "${YELLOW}⚠${NC} No Obsidian vaults found (will be created on first run)"
 fi
 
-BACKUP_COUNT=$(find backups -name "noctura-*.tar.gz" 2>/dev/null | wc -l)
-if [ "$BACKUP_COUNT" -gt 0 ]; then
-    echo -e "${GREEN}✓${NC} $BACKUP_COUNT backup(s) found"
+if [ -d "backups" ]; then
+    BACKUP_COUNT=$(find backups -name "noctura-*.tar.gz" 2>/dev/null | wc -l)
+    if [ "$BACKUP_COUNT" -gt 0 ]; then
+        echo -e "${GREEN}✓${NC} $BACKUP_COUNT backup(s) found"
+    else
+        echo -e "${YELLOW}⚠${NC} No backups found"
+    fi
 else
-    echo -e "${YELLOW}⚠${NC} No backups found"
+    echo -e "${YELLOW}⚠${NC} No backups directory found"
 fi
 
 echo ""
