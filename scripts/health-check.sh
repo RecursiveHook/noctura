@@ -101,17 +101,30 @@ if docker compose ps 2>/dev/null | grep -q "noctura-couchdb"; then
         if [ -f .env ]; then
             source .env
             COUCHDB_PORT=${COUCHDB_PORT:-5984}
+            COUCHDB_USER=${COUCHDB_USER:-admin}
+            
+            if [ -z "${COUCHDB_URL:-}" ]; then
+                if docker compose ps caddy 2>/dev/null | grep -q "Up"; then
+                    COUCHDB_URL="https://localhost/couchdb"
+                    CURL_OPTS="-k"
+                else
+                    COUCHDB_URL="http://localhost:${COUCHDB_PORT}"
+                    CURL_OPTS=""
+                fi
+            fi
+            
+            CURL_OPTS=${CURL_OPTS:-""}
             
             echo ""
             echo "🌐 Checking CouchDB Health..."
             
-            if curl -sf "http://localhost:${COUCHDB_PORT}/_up" > /dev/null 2>&1; then
+            if curl -sf ${CURL_OPTS} "${COUCHDB_URL}/_up" > /dev/null 2>&1; then
                 echo -e "${GREEN}✓${NC} CouchDB health check passed"
                 
-                COUCHDB_VERSION=$(curl -s "http://localhost:${COUCHDB_PORT}/" 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+                COUCHDB_VERSION=$(curl -s ${CURL_OPTS} "${COUCHDB_URL}/" 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
                 echo -e "${GREEN}✓${NC} CouchDB version: $COUCHDB_VERSION"
                 
-                if curl -sf -u "${COUCHDB_USER:-admin}:${COUCHDB_PASSWORD}" "http://localhost:${COUCHDB_PORT}/_all_dbs" > /dev/null 2>&1; then
+                if curl -sf ${CURL_OPTS} -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" "${COUCHDB_URL}/_all_dbs" > /dev/null 2>&1; then
                     echo -e "${GREEN}✓${NC} CouchDB authentication working"
                     echo -e "${GREEN}✓${NC} CouchDB is accessible"
                 else
