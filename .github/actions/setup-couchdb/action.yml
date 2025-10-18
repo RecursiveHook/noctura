@@ -7,7 +7,7 @@ inputs:
   https_warmup_timeout:
     description: 'Timeout in seconds for HTTPS warmup'
     required: false
-    default: '30'
+    default: '60'
 outputs:
   couchdb_url:
     description: 'CouchDB URL to use for connections'
@@ -47,22 +47,11 @@ runs:
           echo "COUCHDB_URL=https://localhost/couchdb" >> $GITHUB_ENV
           echo "CURL_OPTS=-sk" >> $GITHUB_ENV
         else
-          echo "⚠️  Caddy HTTPS not accessible, using direct CouchDB access"
-          COUCHDB_CONTAINER=$(docker compose ps -q couchdb)
-          COUCHDB_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $COUCHDB_CONTAINER)
-          
-          if curl -sf -u "admin:${{ inputs.couchdb_password }}" "http://${COUCHDB_IP}:5984/" > /dev/null 2>&1; then
-            echo "✅ CouchDB directly accessible at http://${COUCHDB_IP}:5984/"
-            echo "couchdb_url=http://${COUCHDB_IP}:5984" >> $GITHUB_OUTPUT
-            echo "curl_opts=-s" >> $GITHUB_OUTPUT
-            echo "COUCHDB_URL=http://${COUCHDB_IP}:5984" >> $GITHUB_ENV
-            echo "CURL_OPTS=-s" >> $GITHUB_ENV
-          else
-            echo "::error::Cannot access CouchDB via HTTPS or direct connection"
-            docker compose logs caddy
-            docker compose logs couchdb
-            exit 1
-          fi
+          echo "::error::Caddy HTTPS not accessible after warmup timeout"
+          echo "This is a critical failure - production deployments require HTTPS"
+          docker compose logs caddy
+          docker compose logs couchdb
+          exit 1
         fi
         
         echo "Using CouchDB URL: ${COUCHDB_URL}"
