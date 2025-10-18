@@ -118,7 +118,7 @@ HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${HTTP_
 if [ "$HTTP_RESPONSE" = "301" ] || [ "$HTTP_RESPONSE" = "308" ] || [ "$HTTP_RESPONSE" = "200" ]; then
     test_passed "HTTP endpoint is accessible (status: $HTTP_RESPONSE)"
 else
-    if [ "$COUCHDB_BASE_URL" != "https://"* ]; then
+    if [[ "$COUCHDB_BASE_URL" != "https://"* ]]; then
         echo "  ⚠️  HTTP redirect test skipped (using HTTP fallback mode)"
     else
         test_failed "HTTP endpoint not accessible (status: $HTTP_RESPONSE)"
@@ -127,7 +127,7 @@ fi
 
 echo ""
 echo "5️⃣  Testing HTTPS Endpoint..."
-if [ "$COUCHDB_BASE_URL" = "https://"* ]; then
+if [[ "$COUCHDB_BASE_URL" == "https://"* ]]; then
     if curl -sf -k "https://localhost:${HTTPS_PORT}" > /dev/null 2>&1; then
         test_passed "HTTPS endpoint is accessible"
     else
@@ -139,7 +139,7 @@ fi
 
 echo ""
 echo "6️⃣  Testing TLS Certificate..."
-if [ "$COUCHDB_BASE_URL" = "https://"* ]; then
+if [[ "$COUCHDB_BASE_URL" == "https://"* ]]; then
     if command -v openssl > /dev/null 2>&1; then
         TLS_INFO=$(echo | openssl s_client -connect "localhost:${HTTPS_PORT}" -servername localhost 2>/dev/null | grep "Protocol")
         if echo "$TLS_INFO" | grep -qE "TLSv1\.[23]"; then
@@ -233,7 +233,7 @@ fi
 
 echo ""
 echo "1️⃣4️⃣  Testing Obsidian Web Interface..."
-if [ "$COUCHDB_BASE_URL" = "https://"* ]; then
+if [[ "$COUCHDB_BASE_URL" == "https://"* ]]; then
     if curl -sf -k "https://localhost:${HTTPS_PORT}/obsidian/" > /dev/null 2>&1; then
         test_passed "Obsidian web interface accessible via HTTPS"
     else
@@ -307,7 +307,7 @@ if [ $FAILED_TESTS -eq 0 ]; then
     echo ""
     echo "🔐 Security Features Verified:"
     echo "  ✅ Encryption at rest (gocryptfs)"
-    if [ "$COUCHDB_BASE_URL" = "https://"* ]; then
+    if [[ "$COUCHDB_BASE_URL" == "https://"* ]]; then
         echo "  ✅ Encryption in flight (TLS/HTTPS)"
     else
         echo "  ⚠️  TLS/HTTPS tests skipped (HTTP fallback mode)"

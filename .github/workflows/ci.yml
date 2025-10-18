@@ -10,7 +10,7 @@ on:
 env:
   COUCHDB_PASSWORD: test_password_123456789
   VNC_PASSWORD: test_vnc_password
-  ENCRYPTION_KEY: test_encryption_key_12345678
+  ENCRYPTION_KEY: test_encryption_key_1234567890ab
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
