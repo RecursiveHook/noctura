@@ -8,9 +8,7 @@
 }
 
 :443 {
-  tls internal {
-    on_demand
-  }
+  tls internal
 
   handle /couchdb/* {
     uri strip_prefix /couchdb
